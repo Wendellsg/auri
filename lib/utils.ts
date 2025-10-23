@@ -20,3 +20,58 @@ export function formatDateTime(date: Date | string) {
     timeStyle: "short",
   });
 }
+
+const IMAGE_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "avif",
+  "svg",
+]);
+
+const VIDEO_EXTENSIONS = new Set([
+  "mp4",
+  "mov",
+  "mkv",
+  "webm",
+  "avi",
+]);
+
+const AUDIO_EXTENSIONS = new Set([
+  "mp3",
+  "wav",
+  "ogg",
+  "flac",
+  "m4a",
+]);
+
+const TEXT_EXTENSIONS = new Set([
+  "txt",
+  "md",
+  "json",
+  "csv",
+  "log",
+]);
+
+export type FilePreviewType =
+  | "image"
+  | "video"
+  | "audio"
+  | "pdf"
+  | "text"
+  | "other";
+
+export function getFilePreviewType(fileName: string | undefined | null) {
+  if (!fileName) return "other" as FilePreviewType;
+  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
+
+  if (IMAGE_EXTENSIONS.has(extension)) return "image";
+  if (VIDEO_EXTENSIONS.has(extension)) return "video";
+  if (AUDIO_EXTENSIONS.has(extension)) return "audio";
+  if (extension === "pdf") return "pdf";
+  if (TEXT_EXTENSIONS.has(extension)) return "text";
+
+  return "other";
+}

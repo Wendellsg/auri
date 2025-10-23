@@ -8,7 +8,7 @@ Painel administrativo moderno para equipes internas realizarem upload, versionam
 - **React 19** – Componentes client/server convivendo com hooks modernos.
 - **Tailwind CSS v4 + shadcn-inspired UI** – Design system com componentes reutilizáveis (`button`, `card`, `table`, etc.).
 - **AWS SDK v3 (S3)** – Upload, listagem e exclusão de objetos diretamente no bucket configurado.
-- **Persistência local com JSON** – Armazena o cadastro de usuários e permissões em `data/users.json`.
+- **Prisma + PostgreSQL** – Persistência de usuários, permissões e credenciais de storage com migrações tipadas.
 
 ## Pré-requisitos
 
@@ -19,18 +19,13 @@ Painel administrativo moderno para equipes internas realizarem upload, versionam
 
 ## Variáveis de ambiente
 
-Crie um arquivo `.env.local` na raiz do projeto com as variáveis abaixo:
+Use o arquivo `.env.example` como base para criar `.env.local`:
 
 ```bash
-AWS_ACCESS_KEY_ID="seu_access_key"
-AWS_SECRET_ACCESS_KEY="seu_secret_key"
-AWS_REGION="sa-east-1"
-S3_BUCKET_NAME="nome-do-seu-bucket"
-# informe apenas host (cdn.exemplo.com) ou URL completa (https://cdn.exemplo.com)
-CDN_HOST="cdn.exemplo.com"
+cp .env.example .env.local
 ```
 
-Opcionalmente você pode definir `NEXT_PUBLIC_APP_URL` para apontar fetches do lado do servidor em ambientes diferentes de desenvolvimento.
+Preencha `DATABASE_URL` com a conexão do seu Postgres. Os campos de AWS/CDN podem ficar vazios se você preferir configurar tudo diretamente pelo painel de configurações (`/settings`).
 
 ## Como rodar localmente
 
@@ -38,11 +33,19 @@ Opcionalmente você pode definir `NEXT_PUBLIC_APP_URL` para apontar fetches do l
    ```bash
    npm install
    ```
-2. Execute a aplicação em modo desenvolvimento:
+2. Gere o Prisma Client e crie o schema no banco (usa `db push`):
+   ```bash
+   npm run prisma:push
+   ```
+3. Opcional: abra o Prisma Studio para inspecionar dados:
+   ```bash
+   npm run prisma:studio
+   ```
+4. Execute a aplicação em modo desenvolvimento:
    ```bash
    npm run dev
    ```
-3. Acesse [http://localhost:3000](http://localhost:3000).
+5. Acesse [http://localhost:3000](http://localhost:3000).
 
 ### Comandos úteis
 
@@ -50,44 +53,61 @@ Opcionalmente você pode definir `NEXT_PUBLIC_APP_URL` para apontar fetches do l
 - `npm run build` – build otimizado para produção.
 - `npm start` – sobe o build de produção.
 - `npm run lint` – analisa o código com ESLint/TypeScript.
+- `npm run prisma:generate` – regenera o Prisma Client ao alterar o schema.
+- `npm run prisma:push` – aplica o schema atual no banco (útil em desenvolvimento).
+- `npm run prisma:studio` – abre interface web para inspecionar registros.
 
 ## Arquitetura e pastas relevantes
 
 ```
 app/
-  layout.tsx          → layout raiz com header persistente
-  page.tsx            → dashboard de arquivos (upload, listagem, métricas)
-  users/page.tsx      → painel de usuários, permissões e senha temporária
+  layout.tsx             → layout raiz com header persistente
+  page.tsx               → workspace de arquivos com dropzone e navegação estilo file-system
+  dashboard/page.tsx     → visão executiva com métricas e checklist operacional
+  users/page.tsx         → painel de usuários, permissões e senha temporária
+  settings/page.tsx      → formulário de credenciais S3/CDN para administradores
 app/api/
-  files/route.ts      → GET/POST/DELETE para integração com S3 e CDN
-  users/route.ts      → GET/POST para gestão de usuários e senhas geradas
+  files/route.ts         → GET/POST/DELETE integrados ao S3 via credenciais do banco
+  users/route.ts         → GET/POST para gestão de usuários e senhas temporárias
+  settings/route.ts      → GET/PUT para manter as credenciais de storage
 components/
-  dashboard/          → componentes de tela (arquivos/usuários)
-  layout/             → cabeçalho e shell da interface
-  ui/                 → kit shadcn-tailwind (button, card, table etc.)
-data/users.json       → seed local com usuários e permissões disponíveis
-lib/aws.ts            → cliente S3 e utilitário de reescrita para CDN
-lib/password.ts       → gerador de senhas fortes
-lib/users-store.ts    → abstração de persistência em arquivo
+  dashboard/             → componentes de tela (arquivos, usuários, configurações)
+  layout/                → cabeçalho e shell da interface
+  ui/                    → kit shadcn-tailwind (button, card, table etc.)
+lib/
+  prisma.ts              → client Prisma singleton
+  settings.ts            → acesso centralizado às credenciais de storage
+  users.ts               → repositório de usuários/prisma
+  password.ts            → gerador de senhas fortes e hashing
+  aws.ts                 → helpers de S3/CDN
+prisma/schema.prisma     → schema do banco com Prisma
+.env.example             → exemplo de variáveis de ambiente
 ```
 
 ## Fluxo de upload e CDN
 
 1. Usuário seleciona arquivo e (opcionalmente) define pasta e permissões.
-2. O backend (`POST /api/files`) envia o objeto para S3 (`PutObjectCommand`), grava as permissões no metadata e retorna a URL pública do S3.
-3. A URL é reescrita pelo helper `toCdnUrl`, substituindo o host pelo domínio CDN configurado.
-4. O dashboard atualiza a listagem chamando `GET /api/files`. Quando as variáveis AWS não estão configuradas, é entregue um payload mockado para viabilizar o design sem integração.
+2. O backend (`POST /api/files`) carrega as credenciais gravadas no Postgres (`/settings`) e envia o objeto para o S3 (`PutObjectCommand`).
+3. A URL de retorno é reescrita com `toCdnUrl`, trocando o host pelo domínio CDN configurado.
+4. O dashboard atualiza a listagem chamando `GET /api/files`. Caso o storage ainda não esteja configurado, um dataset mockado é exibido com orientação para finalizar o setup.
+5. A interface apresenta uma fila de uploads em andamento com progresso individual e feedback de sucesso/erro.
 
 ### Exclusão
 
 `DELETE /api/files?key=path/do/arquivo` remove o objeto no bucket, permitindo gerenciar o ciclo de vida direto do painel.
 
+### Thumbnails inteligentes
+
+- A listagem exibe miniaturas para imagens e ícones dinâmicos para vídeos, áudios, PDFs/textos e demais formatos.
+- As URLs da CDN são renderizadas sempre que disponíveis, garantindo que as miniaturas aproveitem cache na borda.
+- Para pré-visualizar conteúdo completo (vídeo/áudio/PDF), abra o link direto ou via CDN e mantenha o bucket/CDN com CORS liberado para o painel.
+
 ## Gestão de usuários
 
-- `GET /api/users` devolve usuários armazenados em `data/users.json` junto com a lista de permissões disponíveis.
-- `POST /api/users` valida o payload, persiste o usuário como `invited` e retorna uma senha temporária gerada por `generateSecurePassword`.
+- `GET /api/users` consulta diretamente o Postgres via Prisma e devolve usuários + permissões disponíveis.
+- `POST /api/users` valida o payload, persiste o usuário como `invited` e retorna uma senha temporária gerada por `generateSecurePassword` (hash armazenado no banco).
 - O painel exibe métricas, permite filtrar por nome/e-mail/perfil e copia a senha temporária com um clique.
-- O arquivo `data/users.json` pode ser versionado com dados fictícios para desenvolvimento; em produção substitua por banco ou API real.
+- Utilize `npm run prisma:studio` para administrar usuários e atualizar status manualmente caso necessário.
 
 ## Boas práticas e próximos passos sugeridos
 
@@ -96,13 +116,14 @@ lib/users-store.ts    → abstração de persistência em arquivo
 - Provisionar infraestrutura IaC (Terraform/CDK) para bucket, CDN e secrets.
 - Implementar cache e paginação de objetos grandes via `ContinuationToken`.
 - Integrar notificações (Slack, e-mail) para avisar uploads críticos.
+- Adicionar criptografia em repouso às credenciais e rotação automática das chaves AWS.
 
 ## Lista de tarefas (roadmap)
 
 - [x] Dashboard de arquivos com upload, estatísticas e integração com CDN.
 - [x] Painel de usuários com geração automática de senha e filtros.
 - [x] API `/api/files` com GET/POST/DELETE para S3.
-- [x] API `/api/users` com persistência local em JSON.
+- [x] API `/api/users` com persistência via Prisma/Postgres.
 - [x] Design system base com componentes shadcn-tailwind.
 - [ ] Implementar autenticação e sessão por usuário.
 - [ ] Adicionar testes automatizados (unitários e de integração API).

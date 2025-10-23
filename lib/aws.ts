@@ -1,48 +1,41 @@
 import { S3Client } from "@aws-sdk/client-s3";
 
-const region =
-  process.env.AWS_REGION ??
-  process.env.AWS_DEFAULT_REGION ??
-  process.env.NEXT_PUBLIC_AWS_REGION;
+import { StorageSettings } from "@/lib/settings";
 
-const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-
-if (!region) {
-  console.warn("AWS region não configurada. Defina AWS_REGION nas variáveis de ambiente.");
+export function createS3Client(settings: StorageSettings) {
+  return new S3Client({
+    region: settings.region,
+    credentials: {
+      accessKeyId: settings.accessKey,
+      secretAccessKey: settings.secretKey,
+    },
+  });
 }
 
-let client: S3Client | null = null;
-
-export function getS3Client() {
-  if (!client) {
-    client = new S3Client({
-      region: region ?? "us-east-1",
-      credentials:
-        accessKeyId && secretAccessKey
-          ? {
-              accessKeyId,
-              secretAccessKey,
-            }
-          : undefined,
-    });
-  }
-
-  return client;
+export function encodeS3Key(key: string) {
+  return key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 }
 
-export const BUCKET_NAME = process.env.S3_BUCKET_NAME ?? process.env.AWS_S3_BUCKET;
-export const CDN_HOST = process.env.CDN_HOST ?? process.env.NEXT_PUBLIC_CDN_HOST;
-export const AWS_REGION = region ?? "us-east-1";
+export function buildS3Url(settings: StorageSettings, key: string) {
+  return `https://${settings.bucketName}.s3.${settings.region}.amazonaws.com/${encodeS3Key(
+    key,
+  )}`;
+}
 
-export function toCdnUrl(s3Url: string) {
-  if (!CDN_HOST) return s3Url;
+export function toCdnUrl(url: string, cdnHost?: string) {
+  if (!cdnHost) return url;
   try {
-    const url = new URL(s3Url);
-    url.host = CDN_HOST.replace(/^https?:\/\//, "");
-    url.protocol = CDN_HOST.startsWith("https") ? "https:" : url.protocol;
-    return url.toString();
+    const nextUrl = new URL(url);
+    const normalized = cdnHost.replace(/^https?:\/\//, "");
+    nextUrl.host = normalized;
+    if (cdnHost.startsWith("https://")) {
+      nextUrl.protocol = "https:";
+    }
+    return nextUrl.toString();
   } catch {
-    return s3Url;
+    return url;
   }
 }

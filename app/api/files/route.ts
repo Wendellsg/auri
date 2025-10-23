@@ -6,7 +6,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 
-import { AWS_REGION, BUCKET_NAME, CDN_HOST, getS3Client, toCdnUrl } from "@/lib/aws";
+import { buildS3Url, createS3Client, toCdnUrl } from "@/lib/aws";
+import { getStorageSettings } from "@/lib/settings";
 
 const FALLBACK_FILES = [
   {
@@ -38,13 +39,13 @@ const FALLBACK_FILES = [
   },
 ];
 
-function mapS3Object(object: S3Object) {
+function mapS3Object(object: S3Object, config: Awaited<typeof getStorageSettings>) {
   const key = object.Key ?? "arquivo";
-  const encodedKey = key
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-  const url = `https://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${encodedKey}`;
+  const url =
+    config && key
+      ? buildS3Url(config, key)
+      : `https://example-bucket.s3.amazonaws.com/${encodeURIComponent(key)}`;
+
   return {
     key,
     fileName: key.split("/").pop() ?? key,
@@ -53,12 +54,14 @@ function mapS3Object(object: S3Object) {
     uploadedBy: object.Owner?.DisplayName ?? "Sistema",
     permissions: object.StorageClass ? [object.StorageClass] : [],
     url,
-    cdnUrl: toCdnUrl(url),
+    cdnUrl: toCdnUrl(url, config?.cdnHost),
   };
 }
 
 export async function GET() {
-  if (!BUCKET_NAME) {
+  const settings = await getStorageSettings();
+
+  if (!settings) {
     return NextResponse.json({
       files: FALLBACK_FILES.map((file) => ({
         ...file,
@@ -68,8 +71,8 @@ export async function GET() {
         totalFiles: FALLBACK_FILES.length,
         totalSize: FALLBACK_FILES.reduce((acc, curr) => acc + curr.size, 0),
         lastUpdated: FALLBACK_FILES[0]?.lastModified ?? new Date().toISOString(),
-        bucket: "configurar S3_BUCKET_NAME",
-        cdnHost: CDN_HOST ?? "configurar CDN_HOST",
+        bucket: "configure em /settings",
+        cdnHost: "configure em /settings",
       },
       recentUploads: FALLBACK_FILES.slice(0, 3).map((file) => ({
         id: file.key,
@@ -82,18 +85,19 @@ export async function GET() {
   }
 
   try {
-    const client = getS3Client();
+    const client = createS3Client(settings);
 
-    const command = new ListObjectsV2Command({
-      Bucket: BUCKET_NAME,
-      MaxKeys: 200,
-    });
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: settings.bucketName,
+        MaxKeys: 200,
+      }),
+    );
 
-    const response = await client.send(command);
     const objects = response.Contents ?? [];
     const files = objects
       .filter((object) => object.Key)
-      .map(mapS3Object)
+      .map((object) => mapS3Object(object, settings))
       .sort(
         (a, b) =>
           new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime(),
@@ -105,8 +109,8 @@ export async function GET() {
         totalFiles: files.length,
         totalSize: files.reduce((acc, curr) => acc + curr.size, 0),
         lastUpdated: new Date().toISOString(),
-        bucket: BUCKET_NAME,
-        cdnHost: CDN_HOST ?? "não configurado",
+        bucket: settings.bucketName,
+        cdnHost: settings.cdnHost || "não configurado",
       },
       recentUploads: files.slice(0, 5).map((file) => ({
         id: file.key,
@@ -126,9 +130,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!BUCKET_NAME) {
+  const settings = await getStorageSettings();
+
+  if (!settings) {
     return NextResponse.json(
-      { message: "Configure S3_BUCKET_NAME para habilitar uploads." },
+      {
+        message:
+          "Credenciais do S3 não configuradas. Acesse o painel de configurações para informar bucket e chaves.",
+      },
       { status: 400 },
     );
   }
@@ -153,12 +162,12 @@ export async function POST(request: Request) {
   const key = [prefix, file.name].filter(Boolean).join("/");
 
   try {
-    const client = getS3Client();
+    const client = createS3Client(settings);
     const buffer = Buffer.from(await file.arrayBuffer());
 
     await client.send(
       new PutObjectCommand({
-        Bucket: BUCKET_NAME,
+        Bucket: settings.bucketName,
         Key: key,
         Body: buffer,
         ContentType: file.type || undefined,
@@ -168,11 +177,7 @@ export async function POST(request: Request) {
       }),
     );
 
-    const encodedKey = key
-      .split("/")
-      .map((segment) => encodeURIComponent(segment))
-      .join("/");
-    const url = `https://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${encodedKey}`;
+    const url = buildS3Url(settings, key);
 
     return NextResponse.json(
       {
@@ -184,7 +189,7 @@ export async function POST(request: Request) {
           lastModified: new Date().toISOString(),
           permissions,
           url,
-          cdnUrl: toCdnUrl(url),
+          cdnUrl: toCdnUrl(url, settings.cdnHost),
         },
       },
       { status: 201 },
@@ -199,9 +204,14 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!BUCKET_NAME) {
+  const settings = await getStorageSettings();
+
+  if (!settings) {
     return NextResponse.json(
-      { message: "Configure S3_BUCKET_NAME para habilitar exclusões." },
+      {
+        message:
+          "Credenciais do S3 não configuradas. Acesse o painel de configurações para informar bucket e chaves.",
+      },
       { status: 400 },
     );
   }
@@ -217,10 +227,10 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const client = getS3Client();
+    const client = createS3Client(settings);
     await client.send(
       new DeleteObjectCommand({
-        Bucket: BUCKET_NAME,
+        Bucket: settings.bucketName,
         Key: key,
       }),
     );

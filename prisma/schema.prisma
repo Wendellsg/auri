@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  editor
+  viewer
+}
+
+enum UserStatus {
+  active
+  invited
+  blocked
+}
+
+model User {
+  id           String      @id @default(uuid())
+  name         String
+  email        String      @unique
+  role         UserRole    @default(editor)
+  status       UserStatus  @default(invited)
+  permissions  String[]    @default([])
+  passwordHash String
+  createdAt    DateTime    @default(now())
+  lastAccessAt DateTime?
+}
+
+model AppSettings {
+  id         Int      @id @default(1)
+  bucketName String?
+  region     String?
+  cdnHost    String?
+  accessKey  String?
+  secretKey  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}

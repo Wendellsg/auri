@@ -1,11 +1,13 @@
+import { Prisma, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-import { generateSecurePassword } from "@/lib/password";
+import { generateSecurePassword, hashPassword } from "@/lib/password";
 import {
   AVAILABLE_PERMISSIONS,
   createUser,
   listUsers,
-} from "@/lib/users-store";
+  normalizePermissions,
+} from "@/lib/users";
 
 export async function GET() {
   try {
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const name = String(payload.name ?? "").trim();
     const email = String(payload.email ?? "").trim();
-    const role = (payload.role ?? "editor") as "admin" | "editor" | "viewer";
+    const role = (payload.role ?? "editor") as UserRole;
     const permissions = Array.isArray(payload.permissions)
       ? payload.permissions
       : String(payload.permissions ?? "")
@@ -40,18 +42,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalizedPermissions = permissions.filter((permission) =>
-      AVAILABLE_PERMISSIONS.includes(permission),
-    );
+    const normalizedPermissions = normalizePermissions(permissions);
+    const password = generateSecurePassword();
+    const passwordHash = hashPassword(password);
 
     const user = await createUser({
       name,
       email,
       role,
       permissions: normalizedPermissions,
+      passwordHash,
     });
-
-    const password = generateSecurePassword();
 
     return NextResponse.json(
       {
@@ -62,6 +63,17 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error(error);
+
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { message: "Já existe um usuário cadastrado com este e-mail." },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
       { message: "Não foi possível criar usuário." },
       { status: 500 },

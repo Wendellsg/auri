@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, scryptSync } from "crypto";
 
 const CHARSETS = {
   upper: "ABCDEFGHJKLMNPQRSTUVWXYZ",
@@ -35,4 +35,10 @@ function shuffle(values: string[]) {
     [values[i], values[j]] = [values[j], values[i]];
   }
   return values;
+}
+
+export function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const derived = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${derived}`;
 }

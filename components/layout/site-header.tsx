@@ -1,6 +1,12 @@
 "use client";
 
-import { Menu, ShieldCheck, UploadCloud } from "lucide-react";
+import {
+  LayoutDashboard,
+  Menu,
+  Settings2,
+  ShieldCheck,
+  UploadCloud,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -10,7 +16,9 @@ import { cn } from "@/lib/utils";
 
 const routes = [
   { href: "/", label: "Arquivos", icon: UploadCloud },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/users", label: "Usuários", icon: ShieldCheck },
+  { href: "/settings", label: "Configurações", icon: Settings2 },
 ];
 
 export function SiteHeader() {
