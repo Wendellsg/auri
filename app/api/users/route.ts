@@ -1,6 +1,7 @@
 import { Prisma, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { assertAdmin, getSessionFromCookies } from "@/lib/auth";
 import { generateSecurePassword, hashPassword } from "@/lib/password";
 import {
   AVAILABLE_PERMISSIONS,
@@ -10,6 +11,21 @@ import {
 } from "@/lib/users";
 
 export async function GET() {
+  const session = await getSessionFromCookies();
+  try {
+    assertAdmin(session);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Acesso restrito a administradores.",
+      },
+      { status: 403 },
+    );
+  }
+
   try {
     const store = await listUsers();
     return NextResponse.json(store);
@@ -23,6 +39,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSessionFromCookies();
+  try {
+    assertAdmin(session);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Acesso restrito a administradores.",
+      },
+      { status: 403 },
+    );
+  }
+
   try {
     const payload = await request.json();
     const name = String(payload.name ?? "").trim();

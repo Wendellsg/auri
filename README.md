@@ -25,7 +25,7 @@ Use o arquivo `.env.example` como base para criar `.env.local`:
 cp .env.example .env.local
 ```
 
-Preencha `DATABASE_URL` com a conexão do seu Postgres. Os campos de AWS/CDN podem ficar vazios se você preferir configurar tudo diretamente pelo painel de configurações (`/settings`).
+Preencha `DATABASE_URL` com a conexão do seu Postgres. Os campos de AWS/CDN podem ficar vazios se você preferir configurar tudo diretamente pelo painel de configurações (`/settings`). Defina também `AUTH_SECRET` com um valor aleatório e forte para assinar os tokens JWT utilizados na autenticação.
 
 ## Como rodar localmente
 
@@ -64,17 +64,23 @@ app/
   layout.tsx             → layout raiz com header persistente
   page.tsx               → workspace de arquivos com dropzone e navegação estilo file-system
   dashboard/page.tsx     → visão executiva com métricas e checklist operacional
+  login/page.tsx         → tela de autenticação baseada em JWT
   users/page.tsx         → painel de usuários, permissões e senha temporária
   settings/page.tsx      → formulário de credenciais S3/CDN para administradores
 app/api/
+  auth/login             → autenticação via e-mail/senha com JWT + cookies HttpOnly
+  auth/logout            → encerra sessão limpando cookie
+  auth/session           → retorna dados mínimos da sessão atual
   files/route.ts         → GET/POST/DELETE integrados ao S3 via credenciais do banco
   users/route.ts         → GET/POST para gestão de usuários e senhas temporárias
   settings/route.ts      → GET/PUT para manter as credenciais de storage
 components/
+  auth/login-form.tsx    → formulário client-side responsável pelo fluxo de login
   dashboard/             → componentes de tela (arquivos, usuários, configurações)
-  layout/                → cabeçalho e shell da interface
+  layout/                → cabeçalho, menu do usuário e shell da interface
   ui/                    → kit shadcn-tailwind (button, card, table etc.)
 lib/
+  auth.ts                → helpers para JWT, cookies e autorização
   prisma.ts              → client Prisma singleton
   settings.ts            → acesso centralizado às credenciais de storage
   users.ts               → repositório de usuários/prisma
@@ -108,6 +114,13 @@ prisma/schema.prisma     → schema do banco com Prisma
 - `POST /api/users` valida o payload, persiste o usuário como `invited` e retorna uma senha temporária gerada por `generateSecurePassword` (hash armazenado no banco).
 - O painel exibe métricas, permite filtrar por nome/e-mail/perfil e copia a senha temporária com um clique.
 - Utilize `npm run prisma:studio` para administrar usuários e atualizar status manualmente caso necessário.
+
+## Autenticação e autorização
+
+- Login feito em `/login` envia `POST /api/auth/login`, valida credenciais no Postgres (hash `scrypt`) e gera JWT assinado com `AUTH_SECRET`.
+- O token é armazenado em cookie `HttpOnly` e renovado automaticamente a cada acesso; o logout limpa o cookie via `POST /api/auth/logout`.
+- Middleware (`middleware.ts`) protege todas as rotas de aplicação e APIs (exceto `/api/auth/*`), redirecionando usuários não autenticados para `/login`.
+- APIs de usuários e configurações exigem perfil `admin`; uploads exigem pelo menos `editor`.
 
 ## Boas práticas e próximos passos sugeridos
 

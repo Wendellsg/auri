@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.731.1",
+    "jose": "^5.2.4",
     "@prisma/client": "^5.20.0",
     "@radix-ui/react-slot": "^1.1.2",
     "class-variance-authority": "^0.7.0",

@@ -7,6 +7,7 @@ import {
 import { NextResponse } from "next/server";
 
 import { buildS3Url, createS3Client, toCdnUrl } from "@/lib/aws";
+import { ensureEditor, getSessionFromCookies } from "@/lib/auth";
 import { getStorageSettings } from "@/lib/settings";
 
 const FALLBACK_FILES = [
@@ -59,6 +60,11 @@ function mapS3Object(object: S3Object, config: Awaited<typeof getStorageSettings
 }
 
 export async function GET() {
+  const session = await getSessionFromCookies();
+  if (!session) {
+    return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
+  }
+
   const settings = await getStorageSettings();
 
   if (!settings) {
@@ -130,6 +136,25 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSessionFromCookies();
+  if (!session) {
+    return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
+  }
+
+  try {
+    ensureEditor(session);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Permissões insuficientes para enviar arquivos.",
+      },
+      { status: 403 },
+    );
+  }
+
   const settings = await getStorageSettings();
 
   if (!settings) {
@@ -204,6 +229,25 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const session = await getSessionFromCookies();
+  if (!session) {
+    return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
+  }
+
+  try {
+    ensureEditor(session);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Permissões insuficientes para remover arquivos.",
+      },
+      { status: 403 },
+    );
+  }
+
   const settings = await getStorageSettings();
 
   if (!settings) {

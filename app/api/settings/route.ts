@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { assertAdmin, getSessionFromCookies } from "@/lib/auth";
 import {
   getStorageSettings,
   sanitizeSettingsForClient,
@@ -7,6 +8,21 @@ import {
 } from "@/lib/settings";
 
 export async function GET() {
+  const session = await getSessionFromCookies();
+  try {
+    assertAdmin(session);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Acesso restrito a administradores.",
+      },
+      { status: 403 },
+    );
+  }
+
   try {
     const settings = await getStorageSettings();
     return NextResponse.json({
@@ -22,6 +38,21 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const session = await getSessionFromCookies();
+  try {
+    assertAdmin(session);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Acesso restrito a administradores.",
+      },
+      { status: 403 },
+    );
+  }
+
   try {
     const payload = await request.json();
     const bucketName = String(payload.bucketName ?? "").trim();

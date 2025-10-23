@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/components/layout/user-menu";
 import { cn } from "@/lib/utils";
 
 const routes = [
@@ -65,9 +66,7 @@ export function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="secondary" className="hidden sm:inline-flex">
-            Documentação
-          </Button>
+          <UserMenu />
           <Button
             size="icon"
             variant="ghost"
@@ -99,9 +98,6 @@ export function SiteHeader() {
                 </Link>
               );
             })}
-            <Button variant="secondary" className="mt-2 justify-start">
-              Documentação
-            </Button>
           </nav>
         </div>
       ) : null}
