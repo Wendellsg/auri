@@ -106,14 +106,14 @@ prisma/schema.prisma     → schema do banco com Prisma
 ## Fluxo de upload e CDN
 
 1. Usuário seleciona arquivo e (opcionalmente) define o prefixo/pasta.
-2. O backend (`POST /api/files`) carrega as credenciais gravadas no MongoDB (`/settings`) e envia o objeto para o S3 (`PutObjectCommand`).
-3. A URL de retorno é reescrita com `toCdnUrl`, trocando o host pelo domínio CDN configurado.
-4. O dashboard atualiza a listagem chamando `GET /api/files`. Caso o storage ainda não esteja configurado, um dataset mockado é exibido com orientação para finalizar o setup.
-5. A interface apresenta uma fila de uploads em andamento com progresso individual e feedback de sucesso/erro.
+2. O painel chama `POST /api/files` com metadados do arquivo; o backend gera uma presigned URL (`PutObjectCommand` assinado pelo servidor) válida por 10 minutos.
+3. O navegador envia o arquivo direto para o S3 usando a presigned URL e acompanha o progresso pela `XMLHttpRequest` local.
+4. Após upload bem-sucedido, o painel reconsulta `GET /api/files`; se o storage ainda não estiver configurado, um dataset mock orienta o usuário a finalizar as credenciais.
+5. As URLs retornadas são reescritas com `toCdnUrl`, trocando o host pelo domínio CDN configurado, e a fila mostra status por arquivo.
 
 ### Exclusão
 
-`DELETE /api/files?key=path/do/arquivo` remove o objeto no bucket, permitindo gerenciar o ciclo de vida direto do painel.
+`DELETE /api/files?key=path/do/arquivo` remove o objeto no bucket, permitindo gerenciar o ciclo de vida direto do painel. Para uploads diretos, garanta que o bucket possua regras de CORS permitindo `PUT` a partir do domínio do painel.
 
 ### Thumbnails inteligentes
 

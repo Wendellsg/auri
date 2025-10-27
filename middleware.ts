@@ -27,7 +27,8 @@ function isAssetPath(pathname: string) {
     pathname.startsWith("/static") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/public") ||
-    pathname.startsWith("/fonts")
+    pathname.startsWith("/fonts") ||
+    pathname.startsWith("/assets")
   );
 }
 
@@ -69,6 +70,11 @@ async function isOnboardingCompleted(request: NextRequest) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  console.log(
+    "Asset path, skipping middleware:",
+    isAssetPath(pathname),
+    pathname
+  );
 
   if (isAssetPath(pathname)) {
     return NextResponse.next();

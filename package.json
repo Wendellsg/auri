@@ -13,11 +13,12 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.731.1",
-    "jose": "^5.2.4",
+    "@aws-sdk/s3-request-presigner": "^3.918.0",
     "@prisma/client": "^5.20.0",
     "@radix-ui/react-slot": "^1.1.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "jose": "^5.2.4",
     "lucide-react": "^0.473.0",
     "next": "16.0.0",
     "react": "19.2.0",
@@ -25,14 +26,14 @@
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.0",
     "prisma": "^5.20.0",
     "tailwindcss": "^4",
-    "eslint": "^9",
-    "eslint-config-next": "16.0.0"
+    "typescript": "^5"
   }
 }

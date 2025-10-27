@@ -40,7 +40,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { type FileRecord, type FilesResponse } from "@/lib/types";
+import {
+  type FileRecord,
+  type FilesResponse,
+  type PresignedUploadResponse,
+} from "@/lib/types";
 import {
   cn,
   formatBytes,
@@ -86,6 +90,7 @@ export function FilesWorkspace() {
   const [transfersOpen, setTransfersOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const queueRef = useRef<UploadItem[]>([]);
 
   const normalizedActivePrefix = useMemo(
     () => normalizePrefix(activePrefix),
@@ -130,6 +135,20 @@ export function FilesWorkspace() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    queueRef.current = uploadQueue;
+  }, [uploadQueue]);
+
+  useEffect(() => {
+    return () => {
+      queueRef.current.forEach((item) => {
+        if (item.previewUrl) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (!normalizedActivePrefix) return;
@@ -226,26 +245,90 @@ export function FilesWorkspace() {
 
       const prefixValue = normalizedActivePrefix;
 
-      const queueItems = incoming.map<UploadItem>((file) => ({
-        id: createUploadId(),
-        fileName: file.name,
-        progress: 0,
-        status: "pending",
-      }));
+      const queueItems = incoming.map<UploadItem>((file) => {
+        const previewUrl = file.type.startsWith("image/")
+          ? URL.createObjectURL(file)
+          : undefined;
+        return {
+          id: createUploadId(),
+          fileName: file.name,
+          progress: 0,
+          status: "pending",
+          previewUrl,
+          mimeType: file.type || undefined,
+        };
+      });
 
-      setUploadQueue((prev) => [
-        ...queueItems,
-        ...prev.filter((item) => item.status !== "success"),
-      ]);
+      setUploadQueue((prev) => {
+        const next = [
+          ...queueItems,
+          ...prev.filter((item) => item.status !== "success"),
+        ];
 
-      const uploadSingleFile = (file: File, itemId: string) =>
-        new Promise<void>((resolve, reject) => {
-          const formData = new FormData();
-          formData.append("file", file);
-          if (prefixValue) formData.append("prefix", prefixValue);
+        prev.forEach((item) => {
+          if (
+            item.previewUrl &&
+            !next.some((nextItem) => nextItem.id === item.id)
+          ) {
+            URL.revokeObjectURL(item.previewUrl);
+          }
+        });
 
+        return next;
+      });
+      setTransfersOpen(true);
+
+      const uploadSingleFile = async (file: File, itemId: string) => {
+        let presignData: PresignedUploadResponse | null = null;
+
+        try {
+          const response = await fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: file.name,
+              contentType: file.type,
+              prefix: prefixValue || undefined,
+              size: file.size,
+            }),
+          });
+
+          if (!response.ok) {
+            const message = await response.text();
+            throw new Error(
+              message || "Falha ao preparar upload. Verifique as configurações."
+            );
+          }
+
+          presignData = (await response.json()) as PresignedUploadResponse;
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Não foi possível gerar a URL de upload.";
+          updateQueue(itemId, { status: "error", error: message });
+          throw err instanceof Error ? err : new Error(message);
+        }
+
+        if (!presignData) {
+          const message =
+            "Não foi possível preparar os dados de upload. Tente novamente.";
+          updateQueue(itemId, { status: "error", error: message });
+          throw new Error(message);
+        }
+
+        await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
-          xhr.open("POST", "/api/files");
+          xhr.open("PUT", presignData.uploadUrl);
+          xhr.withCredentials = false;
+
+          Object.entries(presignData.headers ?? {}).forEach(
+            ([header, value]) => {
+              if (value) {
+                xhr.setRequestHeader(header, value);
+              }
+            }
+          );
 
           updateQueue(itemId, { status: "uploading", progress: 0 });
 
@@ -256,26 +339,27 @@ export function FilesWorkspace() {
           };
 
           xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
+            if (xhr.status >= 200 && xhr.status < 400) {
               updateQueue(itemId, { status: "success", progress: 100 });
               resolve();
             } else {
               const message =
                 xhr.responseText ||
-                "Falha no upload. Verifique as configurações.";
+                "Falha no upload para o bucket. Verifique as permissões de CORS.";
               updateQueue(itemId, { status: "error", error: message });
               reject(new Error(message));
             }
           };
 
           xhr.onerror = () => {
-            const message = "Erro de conexão durante o upload.";
+            const message = "Erro de conexão durante o upload para o bucket.";
             updateQueue(itemId, { status: "error", error: message });
             reject(new Error(message));
           };
 
-          xhr.send(formData);
+          xhr.send(file);
         });
+      };
 
       for (let index = 0; index < incoming.length; index += 1) {
         const file = incoming[index];
@@ -685,13 +769,9 @@ export function FilesWorkspace() {
       ) : null}
 
       {transfersOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={closeTransfers}
-          />
-          <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-sm border-l border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+        <div className="fixed bottom-6 right-6 z-50 w-full max-w-md animate-in fade-in slide-in-from-bottom-4">
+          <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-3 flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
                   Transferências em andamento
@@ -705,20 +785,21 @@ export function FilesWorkspace() {
                 variant="ghost"
                 size="icon"
                 onClick={closeTransfers}
+                className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="max-h-[calc(100vh-120px)] overflow-y-auto px-6 py-6">
+            <div className="max-h-72 overflow-y-auto pr-1">
               <UploadProgressList items={uploadQueue} />
               {uploadQueue.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+                <div className="rounded-2xl border border-dashed border-zinc-200 p-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                   Nenhum upload em andamento no momento.
                 </div>
               ) : null}
             </div>
-          </aside>
-        </>
+          </div>
+        </div>
       ) : null}
     </div>
   );

@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
   _Object as S3Object,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextResponse } from "next/server";
 
 import { ensureEditor, getSessionFromCookies } from "@/lib/auth";
@@ -97,6 +98,13 @@ export async function GET() {
   }
 }
 
+type PresignPayload = {
+  fileName?: string;
+  contentType?: string;
+  prefix?: string;
+  size?: number;
+};
+
 export async function POST(request: Request) {
   const session = await getSessionFromCookies();
   if (!session) {
@@ -129,55 +137,76 @@ export async function POST(request: Request) {
     );
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
+  let payload: PresignPayload;
 
-  if (!(file instanceof File)) {
+  try {
+    payload = (await request.json()) as PresignPayload;
+  } catch {
     return NextResponse.json(
-      { message: "Arquivo inválido. Selecione um arquivo para enviar." },
+      { message: "Payload inválido. Envie os metadados do arquivo em JSON." },
       { status: 400 }
     );
   }
 
-  const prefix = String(formData.get("prefix") ?? "")
+  const fileName = String(payload.fileName ?? "").trim();
+  if (!fileName) {
+    return NextResponse.json(
+      { message: "Informe o nome do arquivo para gerar o upload." },
+      { status: 400 }
+    );
+  }
+
+  const prefix = String(payload.prefix ?? "")
     .trim()
     .replace(/^\/|\/$/g, "");
 
-  const key = [prefix, file.name].filter(Boolean).join("/");
+  const key = [prefix, fileName].filter(Boolean).join("/");
+
+  const contentType = payload.contentType
+    ? String(payload.contentType).trim()
+    : undefined;
+
+  const FIVE_GB = 5 * 1024 * 1024 * 1024;
+  if (typeof payload.size === "number" && payload.size > FIVE_GB) {
+    return NextResponse.json(
+      {
+        message:
+          "Tamanho máximo permitido para uploads é de 5GB. Considere fracionar o arquivo.",
+      },
+      { status: 413 }
+    );
+  }
 
   try {
     const client = createS3Client(settings);
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const command = new PutObjectCommand({
+      Bucket: settings.bucketName,
+      Key: key,
+      ContentType: contentType || undefined,
+    });
 
-    await client.send(
-      new PutObjectCommand({
-        Bucket: settings.bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type || undefined,
-      })
-    );
+    const expiresIn = 60 * 10; // 10 minutes
+    const uploadUrl = await getSignedUrl(client, command, { expiresIn });
 
     const url = buildS3Url(settings, key);
+    const cdnUrl = toCdnUrl(url, settings.cdnHost);
 
     return NextResponse.json(
       {
-        message: "Upload realizado com sucesso.",
-        file: {
-          key,
-          fileName: file.name,
-          size: buffer.byteLength,
-          lastModified: new Date().toISOString(),
-          url,
-          cdnUrl: toCdnUrl(url, settings.cdnHost),
-        },
+        message: "URL de upload gerada com sucesso.",
+        uploadUrl,
+        key,
+        expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+        headers: contentType ? { "Content-Type": contentType } : {},
+        publicUrl: url,
+        cdnUrl,
       },
       { status: 201 }
     );
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { message: "Não foi possível fazer upload do arquivo." },
+      { message: "Não foi possível gerar a URL assinada para upload." },
       { status: 500 }
     );
   }

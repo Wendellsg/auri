@@ -27,3 +27,12 @@ export type FilesResponse = {
     size: number;
   }>;
 };
+
+export type PresignedUploadResponse = {
+  uploadUrl: string;
+  key: string;
+  expiresAt: string;
+  headers: Record<string, string>;
+  publicUrl: string;
+  cdnUrl: string;
+};

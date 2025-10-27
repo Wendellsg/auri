@@ -4,7 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -18,7 +24,9 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (
+    event
+  ) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
@@ -42,7 +50,7 @@ export function LoginForm() {
     } catch (err) {
       console.error(err);
       setError(
-        err instanceof Error ? err.message : "Não foi possível entrar agora.",
+        err instanceof Error ? err.message : "Não foi possível entrar agora."
       );
     } finally {
       setLoading(false);
@@ -52,8 +60,17 @@ export function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950">
       <Card className="w-full max-w-md border-zinc-800 bg-zinc-950 text-white shadow-2xl">
-        <CardHeader className="space-y-2 text-center">
-          <CardTitle className="text-2xl">Entrar no painel</CardTitle>
+        <CardHeader className="space-y-4 text-center flex flex-col items-center justify-center">
+          <CardTitle className="text-2xl flex items-center justify-center">
+            <img
+              src="/assets/auri.png"
+              alt="auri"
+              width={48}
+              height={48}
+              className="h-12 w-12 min-w-12 min-h-12 rounded-full mr-2"
+            />
+            Entrar no painel
+          </CardTitle>
           <CardDescription className="text-zinc-400">
             Utilize suas credenciais corporativas para acessar os uploads.
           </CardDescription>

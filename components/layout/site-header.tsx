@@ -46,7 +46,7 @@ export function SiteHeader() {
               width={40}
               height={40}
               alt="auri"
-              src="/auri.png"
+              src="/assets/auri.png"
               className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white dark:text-zinc-900"
             />
             <div className="hidden flex-col sm:flex">

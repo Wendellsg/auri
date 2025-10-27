@@ -104,8 +104,17 @@ export function OnboardingForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 py-12">
       <Card className="w-full max-w-3xl border-zinc-800 bg-zinc-950 text-white shadow-2xl">
-        <CardHeader>
-          <CardTitle>Configuração inicial do painel</CardTitle>
+        <CardHeader className="space-y-4 text-center flex flex-col items-center justify-center">
+          <CardTitle className="text-2xl flex items-center justify-center">
+            <img
+              src="/assets/auri.png"
+              alt="auri"
+              width={48}
+              height={48}
+              className="h-12 w-12 min-w-12 min-h-12 rounded-full mr-2"
+            />
+            Entrar no painel
+          </CardTitle>
           <CardDescription className="text-zinc-400">
             Informe os dados essenciais para iniciar o uso do AUVP Uploader.
             Você pode alterar essas informações depois em /settings ou via banco
