@@ -2,10 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE, verifyAuthToken } from "@/lib/auth-token";
-import {
-  getCachedOnboardingCompleted,
-  setCachedOnboardingCompleted,
-} from "@/lib/onboarding-flag";
+import { getCachedOnboardingCompleted } from "@/lib/onboarding-flag";
 
 const PUBLIC_PATHS = new Set([
   "/api/auth/login",
@@ -55,16 +52,13 @@ async function isOnboardingCompleted(request: NextRequest) {
       cache: "no-store",
     });
     if (!res.ok) {
-      setCachedOnboardingCompleted(true);
-      return true;
+      return false;
     }
     const data = await res.json();
     const completed = Boolean(data.completed);
-    setCachedOnboardingCompleted(completed);
     return completed;
   } catch {
-    setCachedOnboardingCompleted(true);
-    return true;
+    return false;
   }
 }
 

@@ -116,9 +116,8 @@ export function OnboardingForm() {
             Entrar no painel
           </CardTitle>
           <CardDescription className="text-zinc-400">
-            Informe os dados essenciais para iniciar o uso do AUVP Uploader.
-            Você pode alterar essas informações depois em /settings ou via banco
-            de dados.
+            Informe os dados essenciais para iniciar o uso do Auri. Você pode
+            alterar essas informações depois em /settings ou via banco de dados.
           </CardDescription>
         </CardHeader>
         <CardContent>
