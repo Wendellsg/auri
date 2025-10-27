@@ -27,16 +27,6 @@ cp .env.example .env.local
 
 Preencha `DATABASE_URL` com a conexão do seu cluster MongoDB. Os campos de AWS/CDN podem ficar vazios se você preferir configurar tudo diretamente pelo painel de configurações (`/settings`). Defina também `AUTH_SECRET` com um valor aleatório e forte para assinar os tokens JWT utilizados na autenticação.
 
-### Banco de dados local
-
-Se preferir usar o MongoDB em contêiner, basta subir o serviço que acompanha o projeto:
-
-```bash
-docker compose up -d mongo
-```
-
-O container expõe `mongodb://root:root@localhost:27017/auvp_uploader?authSource=admin`, exatamente o valor sugerido em `.env.example`.
-
 ## Como rodar localmente
 
 1. (Opcional) Suba o MongoDB local conforme descrito acima.
@@ -58,6 +48,15 @@ O container expõe `mongodb://root:root@localhost:27017/auvp_uploader?authSource
    ```
 6. Acesse [http://localhost:3000](http://localhost:3000).
 7. Você será redirecionado para `/onboarding` para concluir o setup inicial (host, usuário admin e credenciais AWS).
+
+### Rodando com Docker
+
+```bash
+docker build -t auri .
+docker run --rm -p 3000:3000 --env-file .env.local auri
+```
+
+Certifique-se de expor a mesma instância do MongoDB utilizada pela aplicação.
 
 ### Comandos úteis
 

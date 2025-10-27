@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  UploadProgressList,
+  type UploadItem,
+} from "@/components/dashboard/upload-progress";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,10 +40,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  UploadProgressList,
-  type UploadItem,
-} from "@/components/dashboard/upload-progress";
 import { type FileRecord, type FilesResponse } from "@/lib/types";
 import {
   cn,
@@ -89,7 +89,7 @@ export function FilesWorkspace() {
 
   const normalizedActivePrefix = useMemo(
     () => normalizePrefix(activePrefix),
-    [activePrefix],
+    [activePrefix]
   );
 
   const createUploadId = useCallback(() => {
@@ -101,7 +101,7 @@ export function FilesWorkspace() {
 
   const updateQueue = useCallback((id: string, patch: Partial<UploadItem>) => {
     setUploadQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
     );
   }, []);
 
@@ -120,7 +120,7 @@ export function FilesWorkspace() {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um erro inesperado ao carregar os arquivos.",
+          : "Ocorreu um erro inesperado ao carregar os arquivos."
       );
     } finally {
       setLoading(false);
@@ -136,7 +136,7 @@ export function FilesWorkspace() {
     const exists = data.files.some(
       (file) =>
         file.key === normalizedActivePrefix ||
-        file.key.startsWith(`${normalizedActivePrefix}/`),
+        file.key.startsWith(`${normalizedActivePrefix}/`)
     );
     if (!exists) {
       setActivePrefix("");
@@ -187,7 +187,7 @@ export function FilesWorkspace() {
 
     const folders = currentFolders
       .filter((folder) =>
-        search ? folder.name.toLowerCase().includes(search) : true,
+        search ? folder.name.toLowerCase().includes(search) : true
       )
       .map<ExplorerEntry>((folder) => ({
         type: "folder",
@@ -198,11 +198,7 @@ export function FilesWorkspace() {
     const files = currentFiles
       .filter((file) => {
         if (!search) return true;
-        const haystack = [
-          file.fileName,
-          file.key,
-          file.uploadedBy,
-        ]
+        const haystack = [file.fileName, file.key, file.uploadedBy]
           .join(" ")
           .toLowerCase();
         return haystack.includes(search);
@@ -214,12 +210,12 @@ export function FilesWorkspace() {
 
   const breadcrumbs = useMemo(
     () => (normalizedActivePrefix ? normalizedActivePrefix.split("/") : []),
-    [normalizedActivePrefix],
+    [normalizedActivePrefix]
   );
 
   const requiresSetup = useMemo(
     () => data.stats.bucket.toLowerCase().includes("configure"),
-    [data.stats.bucket],
+    [data.stats.bucket]
   );
 
   const handleFilesUpload = useCallback(
@@ -265,7 +261,8 @@ export function FilesWorkspace() {
               resolve();
             } else {
               const message =
-                xhr.responseText || "Falha no upload. Verifique as configurações.";
+                xhr.responseText ||
+                "Falha no upload. Verifique as configurações.";
               updateQueue(itemId, { status: "error", error: message });
               reject(new Error(message));
             }
@@ -290,7 +287,7 @@ export function FilesWorkspace() {
           setError(
             err instanceof Error
               ? err.message
-              : "Ocorreu um erro inesperado ao enviar o arquivo.",
+              : "Ocorreu um erro inesperado ao enviar o arquivo."
           );
         }
       }
@@ -298,17 +295,12 @@ export function FilesWorkspace() {
       await fetchData();
       setUploading(false);
     },
-    [
-      createUploadId,
-      fetchData,
-      normalizedActivePrefix,
-      updateQueue,
-    ],
+    [createUploadId, fetchData, normalizedActivePrefix, updateQueue]
   );
 
   const handleDelete = async (key: string) => {
     const confirmation = window.confirm(
-      "Tem certeza que deseja remover este arquivo do bucket?",
+      "Tem certeza que deseja remover este arquivo do bucket?"
     );
     if (!confirmation) return;
 
@@ -316,9 +308,12 @@ export function FilesWorkspace() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/files?key=${encodeURIComponent(key)}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/files?key=${encodeURIComponent(key)}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (!response.ok) {
         const message = await response.text();
@@ -331,7 +326,7 @@ export function FilesWorkspace() {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um erro inesperado ao remover o arquivo.",
+          : "Ocorreu um erro inesperado ao remover o arquivo."
       );
     } finally {
       setDeletingKey(null);
@@ -360,7 +355,7 @@ export function FilesWorkspace() {
   };
 
   const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (
-    event,
+    event
   ) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
@@ -393,14 +388,16 @@ export function FilesWorkspace() {
                 "inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 transition",
                 normalizedActivePrefix === ""
                   ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900",
+                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900"
               )}
             >
               <HardDrive className="h-4 w-4" />
-              Meu Drive
             </button>
             {breadcrumbs.map((segment, index) => (
-              <div key={`${segment}-${index}`} className="flex items-center gap-2">
+              <div
+                key={`${segment}-${index}`}
+                className="flex items-center gap-2"
+              >
                 <ChevronRight className="h-3 w-3 text-zinc-400" />
                 <button
                   type="button"
@@ -477,8 +474,8 @@ export function FilesWorkspace() {
             requiresSetup
               ? "opacity-60"
               : isDragging
-                ? "border-zinc-500 bg-zinc-50/60 dark:border-zinc-600 dark:from-zinc-900 dark:to-zinc-950"
-                : "border-zinc-200 dark:border-zinc-800",
+              ? "border-zinc-500 bg-zinc-50/60 dark:border-zinc-600 dark:from-zinc-900 dark:to-zinc-950"
+              : "border-zinc-200 dark:border-zinc-800"
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -489,7 +486,8 @@ export function FilesWorkspace() {
               <AlertCircle className="h-6 w-6 text-amber-500" />
               <p>
                 Configure bucket, região e credenciais em{" "}
-                <strong className="font-semibold">/settings</strong> para habilitar uploads reais ao S3.
+                <strong className="font-semibold">/settings</strong> para
+                habilitar uploads reais ao S3.
               </p>
             </div>
           ) : isDragging ? (
@@ -569,8 +567,8 @@ export function FilesWorkspace() {
                                 normalizePrefix(
                                   normalizedActivePrefix
                                     ? `${normalizedActivePrefix}/${entry.name}`
-                                    : entry.name,
-                                ),
+                                    : entry.name
+                                )
                               )
                             }
                           >
@@ -624,7 +622,8 @@ export function FilesWorkspace() {
                                   <Video className="h-5 w-5 text-zinc-500" />
                                 ) : previewType === "audio" ? (
                                   <AudioLines className="h-5 w-5 text-zinc-500" />
-                                ) : previewType === "pdf" || previewType === "text" ? (
+                                ) : previewType === "pdf" ||
+                                  previewType === "text" ? (
                                   <FileText className="h-5 w-5 text-zinc-500" />
                                 ) : (
                                   <FileQuestion className="h-5 w-5 text-zinc-500" />
@@ -642,11 +641,17 @@ export function FilesWorkspace() {
                           </TableCell>
                           <TableCell>Arquivo</TableCell>
                           <TableCell>{formatBytes(file.size)}</TableCell>
-                          <TableCell>{formatDateTime(file.lastModified)}</TableCell>
+                          <TableCell>
+                            {formatDateTime(file.lastModified)}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button asChild size="icon" variant="ghost">
-                                <a href={file.url} target="_blank" rel="noreferrer">
+                                <a
+                                  href={file.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
                                   <Download className="h-4 w-4" />
                                 </a>
                               </Button>

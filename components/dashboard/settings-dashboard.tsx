@@ -1,11 +1,23 @@
 "use client";
 
-import { CheckCircle2, Loader2, Save, ServerCog, ShieldCheck } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  Save,
+  ServerCog,
+  ShieldCheck,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -20,7 +32,9 @@ type SettingsResponse = {
 };
 
 export function SettingsDashboard() {
-  const [initialData, setInitialData] = useState<SettingsResponse["settings"] | null>(null);
+  const [initialData, setInitialData] = useState<
+    SettingsResponse["settings"] | null
+  >(null);
   const [formState, setFormState] = useState({
     bucketName: "",
     region: "",
@@ -59,7 +73,7 @@ export function SettingsDashboard() {
         setError(
           err instanceof Error
             ? err.message
-            : "Ocorreu um erro ao carregar as configurações.",
+            : "Ocorreu um erro ao carregar as configurações."
         );
       })
       .finally(() => setLoading(false));
@@ -78,7 +92,9 @@ export function SettingsDashboard() {
     );
   }, [formState, initialData]);
 
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (
+    event
+  ) => {
     event.preventDefault();
     setSaving(true);
     setError(null);
@@ -119,7 +135,7 @@ export function SettingsDashboard() {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um erro ao salvar as configurações.",
+          : "Ocorreu um erro ao salvar as configurações."
       );
     } finally {
       setSaving(false);
@@ -138,8 +154,8 @@ export function SettingsDashboard() {
             Configurações de storage
           </h1>
           <p className="max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
-            Defina o bucket padrão, região da AWS e o domínio CDN que será utilizado na
-            reescrita das URLs públicas.
+            Defina o bucket padrão, região da AWS e o domínio CDN que será
+            utilizado na reescrita das URLs públicas.
           </p>
         </div>
         <Badge variant="outline" className="self-start">
@@ -147,13 +163,13 @@ export function SettingsDashboard() {
         </Badge>
       </header>
 
-  <section className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
+      <section className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
         <Card>
           <CardHeader>
             <CardTitle>Bucket & CDN</CardTitle>
             <CardDescription>
-              Essas informações serão utilizadas por toda a aplicação para enviar,
-              listar e distribuir os arquivos carregados.
+              Essas informações serão utilizadas por toda a aplicação para
+              enviar, listar e distribuir os arquivos carregados.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -246,8 +262,8 @@ export function SettingsDashboard() {
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  As credenciais permanecem armazenadas no backend e não são expostas ao
-                  navegador.
+                  As credenciais permanecem armazenadas no backend e não são
+                  expostas ao navegador.
                 </p>
                 <Button
                   type="submit"
@@ -290,8 +306,8 @@ export function SettingsDashboard() {
                   {loading
                     ? "Validando dados..."
                     : initialData?.bucketName
-                      ? "Credenciais carregadas."
-                      : "Configure bucket, região e credenciais para habilitar uploads."}
+                    ? "Credenciais carregadas."
+                    : "Configure bucket, região e credenciais para habilitar uploads."}
                 </p>
               </div>
               {initialData?.bucketName ? (
