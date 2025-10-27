@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 
 FROM node:20-bookworm-slim AS base
+
+# Install OpenSSL for Prisma binaries
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 ENV NODE_ENV=production \
