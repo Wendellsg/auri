@@ -6,9 +6,9 @@ import { generateSecurePassword, hashPassword } from "@/lib/password";
 import { updateUser } from "@/lib/users";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -28,11 +28,20 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const rawPayload = await request
-    .json()
-    .catch(() => ({} as Record<string, unknown>));
-  const payload = rawPayload as Record<string, unknown>;
-  const idFromParams = context.params?.id ?? "";
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = (await request.json()) as Record<string, unknown>;
+  } catch {
+    payload = {};
+  }
+
+  let idFromParams = "";
+  try {
+    const resolvedParams = await context.params;
+    idFromParams = resolvedParams?.id ?? "";
+  } catch {
+    idFromParams = "";
+  }
   const idFromBody =
     typeof payload.id === "string" ? payload.id.trim() : "";
   const id = (idFromParams || idFromBody).trim();
