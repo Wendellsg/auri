@@ -98,6 +98,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  const isOnboardingPath = pathname === "/onboarding";
+  const isPublic = isPublicPath(pathname);
+
+  if (isPublic && !isOnboardingPath) {
+    return NextResponse.next();
+  }
+
   const onboardingCompleted = await isOnboardingCompleted(request);
 
   if (!onboardingCompleted && pathname !== "/onboarding") {
@@ -108,7 +115,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isPublicPath(pathname)) {
+  if (isPublic) {
     return NextResponse.next();
   }
 

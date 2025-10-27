@@ -10,36 +10,7 @@ export type StorageSettings = {
 
 export async function getAppHost() {
   const record = await prisma.appSettings.findUnique({ where: { id: 1 } });
-  return record?.appHost ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
-}
-
-function getEnvStorageSettings(): StorageSettings | null {
-  const bucket =
-    process.env.S3_BUCKET_NAME ??
-    process.env.AWS_S3_BUCKET ??
-    process.env.NEXT_PUBLIC_S3_BUCKET ??
-    "";
-  const region =
-    process.env.AWS_REGION ??
-    process.env.AWS_DEFAULT_REGION ??
-    process.env.NEXT_PUBLIC_AWS_REGION ??
-    "";
-  const cdn =
-    process.env.CDN_HOST ?? process.env.NEXT_PUBLIC_CDN_HOST ?? "";
-  const accessKey = process.env.AWS_ACCESS_KEY_ID ?? "";
-  const secretKey = process.env.AWS_SECRET_ACCESS_KEY ?? "";
-
-  if (bucket && region && accessKey && secretKey) {
-    return {
-      bucketName: bucket,
-      region,
-      cdnHost: cdn,
-      accessKey,
-      secretKey,
-    };
-  }
-
-  return null;
+  return record?.appHost;
 }
 
 export async function getStorageSettings() {
@@ -62,9 +33,8 @@ export async function getStorageSettings() {
     } satisfies StorageSettings;
   }
 
-  return getEnvStorageSettings();
+  return null;
 }
-
 export async function upsertStorageSettings(payload: {
   bucketName: string;
   region: string;
