@@ -5,9 +5,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatDateTime } from "@/lib/utils";
 
 type UserRecord = {
@@ -64,7 +77,7 @@ export function UsersDashboard() {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um problema ao buscar os usuários.",
+          : "Ocorreu um problema ao buscar os usuários."
       );
     } finally {
       setLoading(false);
@@ -84,7 +97,7 @@ export function UsersDashboard() {
       [user.name, user.email, user.role, ...user.permissions]
         .join(" ")
         .toLowerCase()
-        .includes(value),
+        .includes(value)
     );
   }, [data.users, query]);
 
@@ -100,7 +113,9 @@ export function UsersDashboard() {
     });
   };
 
-  const handleCreateUser: React.FormEventHandler<HTMLFormElement> = async (event) => {
+  const handleCreateUser: React.FormEventHandler<HTMLFormElement> = async (
+    event
+  ) => {
     event.preventDefault();
     setCreating(true);
     setError(null);
@@ -118,7 +133,7 @@ export function UsersDashboard() {
       if (!response.ok) {
         const message = await response.text();
         throw new Error(
-          message || "Não foi possível criar o usuário. Tente novamente.",
+          message || "Não foi possível criar o usuário. Tente novamente."
         );
       }
 
@@ -141,7 +156,7 @@ export function UsersDashboard() {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um problema ao criar o usuário.",
+          : "Ocorreu um problema ao criar o usuário."
       );
     } finally {
       setCreating(false);
@@ -151,7 +166,9 @@ export function UsersDashboard() {
   const stats = useMemo(() => {
     const total = data.users.length;
     const admins = data.users.filter((user) => user.role === "admin").length;
-    const invited = data.users.filter((user) => user.status === "invited").length;
+    const invited = data.users.filter(
+      (user) => user.status === "invited"
+    ).length;
     return { total, admins, invited };
   }, [data.users]);
 
@@ -159,7 +176,7 @@ export function UsersDashboard() {
     if (!passwordResult) return;
     try {
       await navigator.clipboard.writeText(
-        `${passwordResult.email}\nSenha temporária: ${passwordResult.password}`,
+        `${passwordResult.email}\nSenha temporária: ${passwordResult.password}`
       );
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -181,8 +198,8 @@ export function UsersDashboard() {
             Gestão de usuários
           </h1>
           <p className="max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
-            Crie contas com senha temporária, acompanhe permissões e garanta que o painel
-            esteja seguro para toda a equipe.
+            Crie contas com senha temporária, acompanhe permissões e garanta que
+            o painel esteja seguro para toda a equipe.
           </p>
           <Badge variant="outline" className="w-fit">
             MongoDB + Prisma
@@ -213,7 +230,7 @@ export function UsersDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Contas com acesso ao painel AUVP Uploader.
+              Contas com acesso ao painel Auri.
             </p>
           </CardContent>
         </Card>
@@ -252,8 +269,8 @@ export function UsersDashboard() {
           <CardHeader>
             <CardTitle>Criar novo usuário</CardTitle>
             <CardDescription>
-              Defina o perfil de acesso e selecione as permissões personalizadas. A senha
-              será gerada automaticamente.
+              Defina o perfil de acesso e selecione as permissões
+              personalizadas. A senha será gerada automaticamente.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -265,7 +282,10 @@ export function UsersDashboard() {
                 <Input
                   value={newUser.name}
                   onChange={(event) =>
-                    setNewUser((state) => ({ ...state, name: event.target.value }))
+                    setNewUser((state) => ({
+                      ...state,
+                      name: event.target.value,
+                    }))
                   }
                   required
                   placeholder="Maria Silva"
@@ -279,7 +299,10 @@ export function UsersDashboard() {
                   type="email"
                   value={newUser.email}
                   onChange={(event) =>
-                    setNewUser((state) => ({ ...state, email: event.target.value }))
+                    setNewUser((state) => ({
+                      ...state,
+                      email: event.target.value,
+                    }))
                   }
                   required
                   placeholder="maria.silva@empresa.com"
@@ -344,7 +367,8 @@ export function UsersDashboard() {
           <CardHeader>
             <CardTitle>Senha temporária</CardTitle>
             <CardDescription>
-              Compartilhe com o colaborador e solicite a troca no primeiro acesso.
+              Compartilhe com o colaborador e solicite a troca no primeiro
+              acesso.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -382,13 +406,14 @@ export function UsersDashboard() {
                   )}
                 </Button>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  A senha expira após o primeiro login. Oriente o usuário a definir uma
-                  senha forte imediatamente.
+                  A senha expira após o primeiro login. Oriente o usuário a
+                  definir uma senha forte imediatamente.
                 </p>
               </>
             ) : (
               <p className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
-                Crie um usuário para visualizar a senha temporária gerada pelo sistema.
+                Crie um usuário para visualizar a senha temporária gerada pelo
+                sistema.
               </p>
             )}
           </CardContent>
@@ -421,13 +446,19 @@ export function UsersDashboard() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center text-sm text-zinc-500">
+                  <TableCell
+                    colSpan={7}
+                    className="py-12 text-center text-sm text-zinc-500"
+                  >
                     Carregando usuários...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center text-sm text-zinc-500">
+                  <TableCell
+                    colSpan={7}
+                    className="py-12 text-center text-sm text-zinc-500"
+                  >
                     Nenhum usuário encontrado.
                   </TableCell>
                 </TableRow>
@@ -453,8 +484,8 @@ export function UsersDashboard() {
                           user.status === "active"
                             ? "success"
                             : user.status === "invited"
-                              ? "warning"
-                              : "outline"
+                            ? "warning"
+                            : "outline"
                         }
                       >
                         {user.status}

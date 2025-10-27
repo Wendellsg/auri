@@ -14,9 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AUVP Uploader",
+  title: "Auri",
   description:
     "Painel administrativo para upload e gestão de arquivos com distribuição via CDN.",
+  icons: "/auri.png",
 };
 
 export default function RootLayout({

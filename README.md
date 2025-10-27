@@ -1,4 +1,4 @@
-# AUVP Uploader
+# AURI
 
 Painel administrativo moderno para equipes internas realizarem upload, versionamento e distribuição de arquivos a partir de um bucket S3 dedicado. As URLs originais dos objetos são automaticamente reescritas para o host configurado da CDN, garantindo performance e governança.
 
