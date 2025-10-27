@@ -732,7 +732,7 @@ export function FilesWorkspace() {
                             <div className="flex items-center justify-end gap-1.5">
                               <Button asChild size="icon" variant="ghost">
                                 <a
-                                  href={file.url}
+                                  href={previewUrl}
                                   target="_blank"
                                   rel="noreferrer"
                                 >

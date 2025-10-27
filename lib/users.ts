@@ -1,4 +1,4 @@
-import { User, UserRole } from "@prisma/client";
+import { User, UserRole, UserStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -62,6 +62,54 @@ export async function touchUserAccess(id: string) {
       lastAccessAt: new Date(),
       status: "active",
     },
+  });
+
+  const { passwordHash, ...safeUser } = user;
+  return safeUser;
+}
+
+export async function updateUser(
+  id: string,
+  payload: {
+    name?: string;
+    email?: string;
+    role?: UserRole;
+    status?: UserStatus;
+    permissions?: string[];
+    passwordHash?: string;
+  },
+): Promise<SafeUser> {
+  const data: {
+    name?: string;
+    email?: string;
+    role?: UserRole;
+    status?: UserStatus;
+    permissions?: string[];
+    passwordHash?: string;
+  } = {};
+
+  if (payload.name !== undefined) {
+    data.name = payload.name;
+  }
+  if (payload.email !== undefined) {
+    data.email = payload.email.toLowerCase();
+  }
+  if (payload.role !== undefined) {
+    data.role = payload.role;
+  }
+  if (payload.status !== undefined) {
+    data.status = payload.status;
+  }
+  if (payload.permissions !== undefined) {
+    data.permissions = normalizePermissions(payload.permissions);
+  }
+  if (payload.passwordHash !== undefined) {
+    data.passwordHash = payload.passwordHash;
+  }
+
+  const user = await prisma.user.update({
+    where: { id },
+    data,
   });
 
   const { passwordHash, ...safeUser } = user;
