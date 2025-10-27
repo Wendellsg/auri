@@ -8,6 +8,11 @@ export type StorageSettings = {
   secretKey: string;
 };
 
+export async function getAppHost() {
+  const record = await prisma.appSettings.findUnique({ where: { id: 1 } });
+  return record?.appHost ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
+}
+
 function getEnvStorageSettings(): StorageSettings | null {
   const bucket =
     process.env.S3_BUCKET_NAME ??

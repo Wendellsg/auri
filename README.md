@@ -46,6 +46,7 @@ Preencha `DATABASE_URL` com a conexão do seu Postgres. Os campos de AWS/CDN pod
    npm run dev
    ```
 5. Acesse [http://localhost:3000](http://localhost:3000).
+6. Você será redirecionado para `/onboarding` para concluir o setup inicial (host, usuário admin e credenciais AWS).
 
 ### Comandos úteis
 
@@ -55,18 +56,21 @@ Preencha `DATABASE_URL` com a conexão do seu Postgres. Os campos de AWS/CDN pod
 - `npm run lint` – analisa o código com ESLint/TypeScript.
 - `npm run prisma:generate` – regenera o Prisma Client ao alterar o schema.
 - `npm run prisma:push` – aplica o schema atual no banco (útil em desenvolvimento).
+- `npm run prisma:migrate` – executa as migrations geradas (produção/CI).
 - `npm run prisma:studio` – abre interface web para inspecionar registros.
 
 ## Arquitetura e pastas relevantes
 
 ```
 app/
-  layout.tsx             → layout raiz com header persistente
-  page.tsx               → workspace de arquivos com dropzone e navegação estilo file-system
-  dashboard/page.tsx     → visão executiva com métricas e checklist operacional
-  login/page.tsx         → tela de autenticação baseada em JWT
-  users/page.tsx         → painel de usuários, permissões e senha temporária
-  settings/page.tsx      → formulário de credenciais S3/CDN para administradores
+  layout.tsx                   → casco global com fontes e tema
+  (private)/layout.tsx         → layout autenticado com cabeçalho e container
+  (private)/page.tsx           → workspace de arquivos com dropzone e navegação estilo file-system
+  (private)/dashboard/page.tsx → visão executiva com métricas e checklist operacional
+  (private)/users/page.tsx     → painel de usuários, permissões e senha temporária
+  (private)/settings/page.tsx  → formulário de credenciais S3/CDN para administradores
+  login/page.tsx               → tela de autenticação baseada em JWT
+  onboarding/page.tsx          → wizard de setup inicial (executado no primeiro acesso)
 app/api/
   auth/login             → autenticação via e-mail/senha com JWT + cookies HttpOnly
   auth/logout            → encerra sessão limpando cookie
@@ -121,6 +125,7 @@ prisma/schema.prisma     → schema do banco com Prisma
 - O token é armazenado em cookie `HttpOnly` e renovado automaticamente a cada acesso; o logout limpa o cookie via `POST /api/auth/logout`.
 - Middleware (`middleware.ts`) protege todas as rotas de aplicação e APIs (exceto `/api/auth/*`), redirecionando usuários não autenticados para `/login`.
 - APIs de usuários e configurações exigem perfil `admin`; uploads exigem pelo menos `editor`.
+- O primeiro acesso dispara o onboarding em `/onboarding` solicitando host do app, credenciais AWS e criação do usuário administrador. O fluxo só libera as demais rotas após conclusão.
 
 ## Boas práticas e próximos passos sugeridos
 
@@ -138,10 +143,8 @@ prisma/schema.prisma     → schema do banco com Prisma
 - [x] API `/api/files` com GET/POST/DELETE para S3.
 - [x] API `/api/users` com persistência via Prisma/Postgres.
 - [x] Design system base com componentes shadcn-tailwind.
-- [ ] Implementar autenticação e sessão por usuário.
+- [x] Implementar autenticação e sessão por usuário.
 - [ ] Adicionar testes automatizados (unitários e de integração API).
-- [ ] Conectar painel de usuários a um serviço de e-mail para envio de credenciais.
-- [ ] Criar logs estruturados e métricas (CloudWatch / OpenTelemetry).
 - [ ] Habilitar paginação e ordenação avançada na tabela de arquivos.
 
 ## Referências adicionais

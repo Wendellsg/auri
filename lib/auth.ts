@@ -5,11 +5,11 @@ import {
   SESSION_COOKIE,
   TOKEN_TTL,
   createAuthToken as createToken,
-  type AuthSession,
   verifyAuthToken as verifyToken,
+  type AuthSession,
 } from "@/lib/auth-token";
-import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
+import { prisma } from "@/lib/prisma";
 
 export {
   SESSION_COOKIE,
@@ -66,7 +66,7 @@ export function clearAuthCookie(response: NextResponse) {
 
 export async function getSessionFromCookies() {
   const cookieStore = cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const token = (await cookieStore).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     return await verifyToken(token);
@@ -95,7 +95,9 @@ export function assertAdmin(session: AuthSession | null) {
 
 export function ensureAuthenticated(current: AuthSession | null) {
   if (!current) {
-    throw new Error("É necessário estar autenticado para utilizar este recurso.");
+    throw new Error(
+      "É necessário estar autenticado para utilizar este recurso."
+    );
   }
   return current;
 }

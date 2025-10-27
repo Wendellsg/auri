@@ -13,6 +13,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/layout/user-menu";
+import { OnboardingAlert } from "@/components/onboarding/onboarding-alert";
 import { cn } from "@/lib/utils";
 
 const routes = [
@@ -28,6 +29,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/80">
+      <OnboardingAlert />
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 sm:px-8 lg:px-12">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 font-semibold">

@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 
-import {
-  authenticateUser,
-  createAuthToken,
-  setAuthCookie,
-} from "@/lib/auth";
+import { authenticateUser, createAuthToken, setAuthCookie } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {

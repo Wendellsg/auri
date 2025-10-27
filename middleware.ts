@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { SESSION_COOKIE, verifyAuthToken } from "@/lib/auth-token";
+import {
+  getCachedOnboardingCompleted,
+  setCachedOnboardingCompleted,
+} from "@/lib/onboarding-flag";
 
 const PUBLIC_PATHS = new Set([
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/session",
+  "/api/onboarding",
+  "/onboarding",
 ]);
 
 function isPublicPath(pathname: string) {
@@ -34,10 +40,47 @@ function unauthorizedResponse(request: NextRequest) {
   return NextResponse.redirect(loginUrl);
 }
 
+async function isOnboardingCompleted(request: NextRequest) {
+  const cached = getCachedOnboardingCompleted();
+  if (typeof cached === "boolean") {
+    return cached;
+  }
+
+  const cookieFlag = request.cookies.get("auvp_onboarding")?.value === "1";
+  if (cookieFlag) {
+    setCachedOnboardingCompleted(true);
+    return true;
+  }
+
+  try {
+    const res = await fetch(new URL("/api/onboarding", request.url), {
+      headers: {
+        "x-internal-onboarding-check": "1",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      setCachedOnboardingCompleted(true);
+      return true;
+    }
+    const data = await res.json();
+    const completed = Boolean(data.completed);
+    setCachedOnboardingCompleted(completed);
+    return completed;
+  } catch {
+    setCachedOnboardingCompleted(true);
+    return true;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isAssetPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  if (request.headers.get("x-internal-onboarding-check") === "1") {
     return NextResponse.next();
   }
 
@@ -53,6 +96,16 @@ export async function middleware(request: NextRequest) {
     } catch {
       return NextResponse.next();
     }
+  }
+
+  const onboardingCompleted = await isOnboardingCompleted(request);
+
+  if (!onboardingCompleted && pathname !== "/onboarding") {
+    return NextResponse.redirect(new URL("/onboarding", request.url));
+  }
+
+  if (onboardingCompleted && pathname === "/onboarding") {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (isPublicPath(pathname)) {

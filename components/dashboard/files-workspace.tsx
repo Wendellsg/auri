@@ -58,7 +58,7 @@ const INITIAL_STATE: FilesResponse = {
 const normalizePrefix = (prefix: string) =>
   prefix.replace(/^\/+|\/+$/g, "");
 
-export function FilesDashboard() {
+export function FilesWorkspace() {
   const [data, setData] = useState<FilesResponse>(INITIAL_STATE);
   const [query, setQuery] = useState("");
   const [activePrefix, setActivePrefix] = useState("");
