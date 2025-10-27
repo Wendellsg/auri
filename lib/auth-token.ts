@@ -7,7 +7,7 @@ export type AuthSession = {
   role: "admin" | "editor" | "viewer";
 };
 
-export const SESSION_COOKIE = "auvp_session";
+export const SESSION_COOKIE = "auri_session";
 export const TOKEN_TTL = 60 * 60 * 8; // 8 horas
 
 function getAuthSecret() {

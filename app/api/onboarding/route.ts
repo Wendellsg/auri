@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth-token";
-import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
 import { setCachedOnboardingCompleted } from "@/lib/onboarding-flag";
+import { hashPassword } from "@/lib/password";
+import { prisma } from "@/lib/prisma";
 import {
   APP_SETTINGS_ID,
   sanitizeSettingsForClient,
@@ -39,14 +39,14 @@ export async function POST(request: Request) {
     if (!appHost || !adminName || !adminEmail || !adminPassword) {
       return NextResponse.json(
         { message: "Informe host do app e credenciais do administrador." },
-        { status: 422 },
+        { status: 422 }
       );
     }
 
     if (!bucketName || !region || !accessKey || !secretKey) {
       return NextResponse.json(
         { message: "Informe bucket, região e chaves da AWS." },
-        { status: 422 },
+        { status: 422 }
       );
     }
 
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
       secure: isProd,
     });
     response.cookies.set({
-      name: "auvp_onboarding",
+      name: "auri_onboarding",
       value: "1",
       httpOnly: false,
       path: "/",
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
     console.error(error);
     return NextResponse.json(
       { message: "Falha ao concluir o onboarding." },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
