@@ -15,7 +15,7 @@ FROM base AS deps
 
 # Install dependencies based on lockfile
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 COPY prisma ./prisma
 RUN npx prisma generate
