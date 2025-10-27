@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -20,7 +20,7 @@ enum UserStatus {
 }
 
 model User {
-  id           String     @id @default(uuid())
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
   name         String
   email        String     @unique
   role         UserRole   @default(editor)
@@ -32,7 +32,7 @@ model User {
 }
 
 model AppSettings {
-  id         Int      @id @default(1)
+  id         String   @id @map("_id")
   bucketName String?
   region     String?
   cdnHost    String?
@@ -44,7 +44,7 @@ model AppSettings {
 }
 
 model OnboardingState {
-  id          Int       @id @default(1)
+  id          String    @id @map("_id")
   completedAt DateTime?
   createdAt   DateTime  @default(now())
 }

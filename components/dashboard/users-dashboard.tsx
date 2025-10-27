@@ -185,7 +185,7 @@ export function UsersDashboard() {
             esteja seguro para toda a equipe.
           </p>
           <Badge variant="outline" className="w-fit">
-            Postgres + Prisma
+            MongoDB + Prisma
           </Badge>
         </div>
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">

@@ -9,23 +9,32 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/layout/user-menu";
 import { OnboardingAlert } from "@/components/onboarding/onboarding-alert";
 import { cn } from "@/lib/utils";
-
-const routes = [
-  { href: "/", label: "Arquivos", icon: UploadCloud },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/users", label: "Usuários", icon: ShieldCheck },
-  { href: "/settings", label: "Configurações", icon: Settings2 },
-];
+import { useSession } from "@/hooks/use-session";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const session = useSession();
+
+  const routes = useMemo(() => {
+    const base = [
+      { href: "/", label: "Arquivos", icon: UploadCloud },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ];
+    if (session?.role === "admin") {
+      base.push(
+        { href: "/users", label: "Usuários", icon: ShieldCheck },
+        { href: "/settings", label: "Configurações", icon: Settings2 },
+      );
+    }
+    return base;
+  }, [session?.role]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/80">

@@ -143,7 +143,7 @@ export function SettingsDashboard() {
           </p>
         </div>
         <Badge variant="outline" className="self-start">
-          Credenciais armazenadas no Postgres
+          Credenciais armazenadas no MongoDB
         </Badge>
       </header>
 

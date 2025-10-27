@@ -4,10 +4,18 @@ import { SESSION_COOKIE } from "@/lib/auth-token";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { setCachedOnboardingCompleted } from "@/lib/onboarding-flag";
-import { sanitizeSettingsForClient, upsertStorageSettings } from "@/lib/settings";
+import {
+  APP_SETTINGS_ID,
+  sanitizeSettingsForClient,
+  upsertStorageSettings,
+} from "@/lib/settings";
+
+const ONBOARDING_STATE_ID = "onboarding-state";
 
 export async function GET() {
-  const state = await prisma.onboardingState.findUnique({ where: { id: 1 } });
+  const state = await prisma.onboardingState.findUnique({
+    where: { id: ONBOARDING_STATE_ID },
+  });
   const completed = Boolean(state?.completedAt);
   setCachedOnboardingCompleted(completed);
   return NextResponse.json({ completed });
@@ -80,20 +88,20 @@ export async function POST(request: Request) {
     });
 
     await prisma.appSettings.upsert({
-      where: { id: 1 },
+      where: { id: APP_SETTINGS_ID },
       update: {
         appHost,
       },
       create: {
-        id: 1,
+        id: APP_SETTINGS_ID,
         appHost,
       },
     });
 
     await prisma.onboardingState.upsert({
-      where: { id: 1 },
+      where: { id: ONBOARDING_STATE_ID },
       update: { completedAt: new Date() },
-      create: { id: 1, completedAt: new Date() },
+      create: { id: ONBOARDING_STATE_ID, completedAt: new Date() },
     });
 
     const response = NextResponse.json({

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE, verifyAuthToken } from "@/lib/auth-token";
 import {
@@ -43,12 +43,6 @@ function unauthorizedResponse(request: NextRequest) {
 async function isOnboardingCompleted(request: NextRequest) {
   const cached = getCachedOnboardingCompleted();
   if (cached === true) {
-    return true;
-  }
-
-  const cookieFlag = request.cookies.get("auvp_onboarding")?.value === "1";
-  if (cookieFlag) {
-    setCachedOnboardingCompleted(true);
     return true;
   }
 

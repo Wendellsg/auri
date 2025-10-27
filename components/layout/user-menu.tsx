@@ -2,38 +2,12 @@
 
 import { LogOut, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
 import { Button } from "@/components/ui/button";
-
-type SessionUser = {
-  name: string;
-  email: string;
-  role: "admin" | "editor" | "viewer";
-};
+import { useSession } from "@/hooks/use-session";
 
 export function UserMenu() {
   const router = useRouter();
-  const [user, setUser] = useState<SessionUser | null>(null);
-
-  useEffect(() => {
-    let subscribed = true;
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const data = await response.json();
-        return data.user as SessionUser;
-      })
-      .then((sessionUser) => {
-        if (subscribed) setUser(sessionUser);
-      })
-      .catch(() => {
-        if (subscribed) setUser(null);
-      });
-    return () => {
-      subscribed = false;
-    };
-  }, []);
+  const user = useSession();
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

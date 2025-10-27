@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
+export const APP_SETTINGS_ID = "app-settings";
+
 export type StorageSettings = {
   bucketName: string;
   region: string;
@@ -9,13 +11,15 @@ export type StorageSettings = {
 };
 
 export async function getAppHost() {
-  const record = await prisma.appSettings.findUnique({ where: { id: 1 } });
-  return record?.appHost;
+  const record = await prisma.appSettings.findUnique({
+    where: { id: APP_SETTINGS_ID },
+  });
+  return record?.appHost ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
 }
 
 export async function getStorageSettings() {
   const record = await prisma.appSettings.findUnique({
-    where: { id: 1 },
+    where: { id: APP_SETTINGS_ID },
   });
 
   if (
@@ -35,6 +39,7 @@ export async function getStorageSettings() {
 
   return null;
 }
+
 export async function upsertStorageSettings(payload: {
   bucketName: string;
   region: string;
@@ -43,7 +48,7 @@ export async function upsertStorageSettings(payload: {
   secretKey?: string | null;
 }) {
   const existing = await prisma.appSettings.findUnique({
-    where: { id: 1 },
+    where: { id: APP_SETTINGS_ID },
   });
 
   const secretKey = payload.secretKey?.trim()
@@ -51,7 +56,7 @@ export async function upsertStorageSettings(payload: {
     : existing?.secretKey ?? null;
 
   const record = await prisma.appSettings.upsert({
-    where: { id: 1 },
+    where: { id: APP_SETTINGS_ID },
     update: {
       bucketName: payload.bucketName,
       region: payload.region,
@@ -60,7 +65,7 @@ export async function upsertStorageSettings(payload: {
       secretKey,
     },
     create: {
-      id: 1,
+      id: APP_SETTINGS_ID,
       bucketName: payload.bucketName,
       region: payload.region,
       cdnHost: payload.cdnHost ?? "",

@@ -8,7 +8,7 @@ Painel administrativo moderno para equipes internas realizarem upload, versionam
 - **React 19** – Componentes client/server convivendo com hooks modernos.
 - **Tailwind CSS v4 + shadcn-inspired UI** – Design system com componentes reutilizáveis (`button`, `card`, `table`, etc.).
 - **AWS SDK v3 (S3)** – Upload, listagem e exclusão de objetos diretamente no bucket configurado.
-- **Prisma + PostgreSQL** – Persistência de usuários, permissões e credenciais de storage com migrações tipadas.
+- **Prisma + MongoDB** – Persistência de usuários, permissões e credenciais de storage com schema consistente e sincronização via `db push`.
 
 ## Pré-requisitos
 
@@ -25,28 +25,39 @@ Use o arquivo `.env.example` como base para criar `.env.local`:
 cp .env.example .env.local
 ```
 
-Preencha `DATABASE_URL` com a conexão do seu Postgres. Os campos de AWS/CDN podem ficar vazios se você preferir configurar tudo diretamente pelo painel de configurações (`/settings`). Defina também `AUTH_SECRET` com um valor aleatório e forte para assinar os tokens JWT utilizados na autenticação.
+Preencha `DATABASE_URL` com a conexão do seu cluster MongoDB. Os campos de AWS/CDN podem ficar vazios se você preferir configurar tudo diretamente pelo painel de configurações (`/settings`). Defina também `AUTH_SECRET` com um valor aleatório e forte para assinar os tokens JWT utilizados na autenticação.
+
+### Banco de dados local
+
+Se preferir usar o MongoDB em contêiner, basta subir o serviço que acompanha o projeto:
+
+```bash
+docker compose up -d mongo
+```
+
+O container expõe `mongodb://root:root@localhost:27017/auvp_uploader?authSource=admin`, exatamente o valor sugerido em `.env.example`.
 
 ## Como rodar localmente
 
-1. Instale as dependências:
+1. (Opcional) Suba o MongoDB local conforme descrito acima.
+2. Instale as dependências:
    ```bash
    npm install
    ```
-2. Gere o Prisma Client e crie o schema no banco (usa `db push`):
+3. Gere o Prisma Client e crie o schema no banco (usa `db push`):
    ```bash
    npm run prisma:push
    ```
-3. Opcional: abra o Prisma Studio para inspecionar dados:
+4. Opcional: abra o Prisma Studio para inspecionar dados:
    ```bash
    npm run prisma:studio
    ```
-4. Execute a aplicação em modo desenvolvimento:
+5. Execute a aplicação em modo desenvolvimento:
    ```bash
    npm run dev
    ```
-5. Acesse [http://localhost:3000](http://localhost:3000).
-6. Você será redirecionado para `/onboarding` para concluir o setup inicial (host, usuário admin e credenciais AWS).
+6. Acesse [http://localhost:3000](http://localhost:3000).
+7. Você será redirecionado para `/onboarding` para concluir o setup inicial (host, usuário admin e credenciais AWS).
 
 ### Comandos úteis
 
@@ -56,7 +67,6 @@ Preencha `DATABASE_URL` com a conexão do seu Postgres. Os campos de AWS/CDN pod
 - `npm run lint` – analisa o código com ESLint/TypeScript.
 - `npm run prisma:generate` – regenera o Prisma Client ao alterar o schema.
 - `npm run prisma:push` – aplica o schema atual no banco (útil em desenvolvimento).
-- `npm run prisma:migrate` – executa as migrations geradas (produção/CI).
 - `npm run prisma:studio` – abre interface web para inspecionar registros.
 
 ## Arquitetura e pastas relevantes
@@ -96,8 +106,8 @@ prisma/schema.prisma     → schema do banco com Prisma
 
 ## Fluxo de upload e CDN
 
-1. Usuário seleciona arquivo e (opcionalmente) define pasta e permissões.
-2. O backend (`POST /api/files`) carrega as credenciais gravadas no Postgres (`/settings`) e envia o objeto para o S3 (`PutObjectCommand`).
+1. Usuário seleciona arquivo e (opcionalmente) define o prefixo/pasta.
+2. O backend (`POST /api/files`) carrega as credenciais gravadas no MongoDB (`/settings`) e envia o objeto para o S3 (`PutObjectCommand`).
 3. A URL de retorno é reescrita com `toCdnUrl`, trocando o host pelo domínio CDN configurado.
 4. O dashboard atualiza a listagem chamando `GET /api/files`. Caso o storage ainda não esteja configurado, um dataset mockado é exibido com orientação para finalizar o setup.
 5. A interface apresenta uma fila de uploads em andamento com progresso individual e feedback de sucesso/erro.
@@ -114,14 +124,14 @@ prisma/schema.prisma     → schema do banco com Prisma
 
 ## Gestão de usuários
 
-- `GET /api/users` consulta diretamente o Postgres via Prisma e devolve usuários + permissões disponíveis.
+- `GET /api/users` consulta diretamente o MongoDB via Prisma e devolve usuários + permissões disponíveis.
 - `POST /api/users` valida o payload, persiste o usuário como `invited` e retorna uma senha temporária gerada por `generateSecurePassword` (hash armazenado no banco).
 - O painel exibe métricas, permite filtrar por nome/e-mail/perfil e copia a senha temporária com um clique.
 - Utilize `npm run prisma:studio` para administrar usuários e atualizar status manualmente caso necessário.
 
 ## Autenticação e autorização
 
-- Login feito em `/login` envia `POST /api/auth/login`, valida credenciais no Postgres (hash `scrypt`) e gera JWT assinado com `AUTH_SECRET`.
+- Login feito em `/login` envia `POST /api/auth/login`, valida credenciais no MongoDB (hash `scrypt`) e gera JWT assinado com `AUTH_SECRET`.
 - O token é armazenado em cookie `HttpOnly` e renovado automaticamente a cada acesso; o logout limpa o cookie via `POST /api/auth/logout`.
 - Middleware (`middleware.ts`) protege todas as rotas de aplicação e APIs (exceto `/api/auth/*`), redirecionando usuários não autenticados para `/login`.
 - APIs de usuários e configurações exigem perfil `admin`; uploads exigem pelo menos `editor`.
@@ -141,7 +151,7 @@ prisma/schema.prisma     → schema do banco com Prisma
 - [x] Dashboard de arquivos com upload, estatísticas e integração com CDN.
 - [x] Painel de usuários com geração automática de senha e filtros.
 - [x] API `/api/files` com GET/POST/DELETE para S3.
-- [x] API `/api/users` com persistência via Prisma/Postgres.
+- [x] API `/api/users` com persistência via Prisma/MongoDB.
 - [x] Design system base com componentes shadcn-tailwind.
 - [x] Implementar autenticação e sessão por usuário.
 - [ ] Adicionar testes automatizados (unitários e de integração API).
