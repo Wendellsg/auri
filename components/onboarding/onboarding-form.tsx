@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -29,7 +35,7 @@ const INITIAL_STATE: FormState = {
   adminEmail: "",
   adminPassword: "",
   bucketName: "",
-  region: "sa-east-1",
+  region: "us-east-1",
   accessKey: "",
   secretKey: "",
   cdnHost: "",
@@ -37,7 +43,7 @@ const INITIAL_STATE: FormState = {
 
 export function OnboardingForm() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState<Step>("dados-base");
+  const [currentStep, setCurrentStep] = useState<Step>("ambiente");
   const [formState, setFormState] = useState<FormState>(INITIAL_STATE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +62,9 @@ export function OnboardingForm() {
     }
   };
 
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (
+    event
+  ) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
@@ -72,14 +80,18 @@ export function OnboardingForm() {
 
       if (!response.ok) {
         const message = await response.json().catch(() => null);
-        throw new Error(message?.message ?? "Não foi possível finalizar o setup.");
+        throw new Error(
+          message?.message ?? "Não foi possível finalizar o setup."
+        );
       }
 
       router.push("/login");
       router.refresh();
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Erro inesperado no onboarding.");
+      setError(
+        err instanceof Error ? err.message : "Erro inesperado no onboarding."
+      );
     } finally {
       setLoading(false);
     }
@@ -95,8 +107,9 @@ export function OnboardingForm() {
         <CardHeader>
           <CardTitle>Configuração inicial do painel</CardTitle>
           <CardDescription className="text-zinc-400">
-            Informe os dados essenciais para iniciar o uso do AUVP Uploader. Você pode
-            alterar essas informações depois em /settings ou via banco de dados.
+            Informe os dados essenciais para iniciar o uso do AUVP Uploader.
+            Você pode alterar essas informações depois em /settings ou via banco
+            de dados.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -111,15 +124,15 @@ export function OnboardingForm() {
                       active
                         ? "rounded-full bg-zinc-100 px-3 py-1 text-zinc-900"
                         : completed
-                          ? "rounded-full bg-emerald-600 px-3 py-1 text-white"
-                          : "rounded-full bg-zinc-800 px-3 py-1"
+                        ? "rounded-full bg-emerald-600 px-3 py-1 text-white"
+                        : "rounded-full bg-zinc-800 px-3 py-1"
                     }
                   >
                     {step === "ambiente"
                       ? "Ambiente"
                       : step === "admin"
-                        ? "Usuário admin"
-                        : "Credenciais AWS"}
+                      ? "Usuário admin"
+                      : "Credenciais AWS"}
                   </span>
                   {index < STEPS.length - 1 ? (
                     <span className="h-px w-8 bg-zinc-800" />
@@ -138,16 +151,22 @@ export function OnboardingForm() {
                     id="appHost"
                     placeholder="https://painel.empresa.com"
                     value={formState.appHost}
-                    onChange={(event) => updateField("appHost", event.target.value)}
+                    onChange={(event) =>
+                      updateField("appHost", event.target.value)
+                    }
                     required
                   />
                   <p className="text-xs text-zinc-500">
-                    Utilizado em notificações e callbacks para construir URLs absolutas do
-                    painel (ex: https://painel.empresa.com).
+                    Utilizado em notificações e callbacks para construir URLs
+                    absolutas do painel (ex: https://painel.empresa.com).
                   </p>
                 </div>
                 <div className="flex justify-end">
-                  <Button type="button" onClick={goToNext} disabled={!formState.appHost}>
+                  <Button
+                    type="button"
+                    onClick={goToNext}
+                    disabled={!formState.appHost}
+                  >
                     Continuar
                   </Button>
                 </div>
@@ -162,7 +181,9 @@ export function OnboardingForm() {
                     id="adminName"
                     placeholder="Maria Silva"
                     value={formState.adminName}
-                    onChange={(event) => updateField("adminName", event.target.value)}
+                    onChange={(event) =>
+                      updateField("adminName", event.target.value)
+                    }
                     required
                   />
                 </div>
@@ -173,7 +194,9 @@ export function OnboardingForm() {
                     type="email"
                     placeholder="maria@empresa.com"
                     value={formState.adminEmail}
-                    onChange={(event) => updateField("adminEmail", event.target.value)}
+                    onChange={(event) =>
+                      updateField("adminEmail", event.target.value)
+                    }
                     required
                   />
                 </div>
@@ -184,12 +207,14 @@ export function OnboardingForm() {
                     type="password"
                     placeholder="Senha forte"
                     value={formState.adminPassword}
-                    onChange={(event) => updateField("adminPassword", event.target.value)}
+                    onChange={(event) =>
+                      updateField("adminPassword", event.target.value)
+                    }
                     required
                   />
                   <p className="text-xs text-zinc-500">
-                    Essa senha vai ser cadastrada como padrão para o administrador.
-                    Recomende a troca no primeiro acesso.
+                    Essa senha vai ser cadastrada como padrão para o
+                    administrador. Recomende a troca no primeiro acesso.
                   </p>
                 </div>
                 <div className="flex justify-between">
@@ -219,7 +244,9 @@ export function OnboardingForm() {
                     id="bucketName"
                     placeholder="empresa-upload-prd"
                     value={formState.bucketName}
-                    onChange={(event) => updateField("bucketName", event.target.value)}
+                    onChange={(event) =>
+                      updateField("bucketName", event.target.value)
+                    }
                     required
                   />
                 </div>
@@ -229,7 +256,9 @@ export function OnboardingForm() {
                     id="region"
                     placeholder="sa-east-1"
                     value={formState.region}
-                    onChange={(event) => updateField("region", event.target.value)}
+                    onChange={(event) =>
+                      updateField("region", event.target.value)
+                    }
                     required
                   />
                 </div>
@@ -238,7 +267,9 @@ export function OnboardingForm() {
                   <Input
                     id="accessKey"
                     value={formState.accessKey}
-                    onChange={(event) => updateField("accessKey", event.target.value)}
+                    onChange={(event) =>
+                      updateField("accessKey", event.target.value)
+                    }
                     required
                   />
                 </div>
@@ -248,7 +279,9 @@ export function OnboardingForm() {
                     id="secretKey"
                     type="password"
                     value={formState.secretKey}
-                    onChange={(event) => updateField("secretKey", event.target.value)}
+                    onChange={(event) =>
+                      updateField("secretKey", event.target.value)
+                    }
                     required
                   />
                 </div>
@@ -258,7 +291,9 @@ export function OnboardingForm() {
                     id="cdnHost"
                     placeholder="cdn.empresa.com"
                     value={formState.cdnHost}
-                    onChange={(event) => updateField("cdnHost", event.target.value)}
+                    onChange={(event) =>
+                      updateField("cdnHost", event.target.value)
+                    }
                   />
                 </div>
                 {error ? (

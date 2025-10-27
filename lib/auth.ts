@@ -23,6 +23,8 @@ export async function authenticateUser(email: string, password: string) {
     where: { email: email.toLowerCase() },
   });
 
+  console.log(user);
+
   if (!user) return null;
   if (user.status === "blocked") return null;
   if (!verifyPassword(password, user.passwordHash)) return null;
