@@ -57,7 +57,7 @@ export function OverviewDashboard() {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um problema ao consultar os dados.",
+          : "Ocorreu um problema ao consultar os dados."
       );
     } finally {
       setLoading(false);
@@ -70,7 +70,7 @@ export function OverviewDashboard() {
 
   const requiresSetup = useMemo(
     () => data.stats.bucket.toLowerCase().includes("configure"),
-    [data.stats.bucket],
+    [data.stats.bucket]
   );
 
   return (
@@ -85,15 +85,16 @@ export function OverviewDashboard() {
             Visão executiva do storage
           </h1>
           <p className="max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
-            Acompanhe uso de armazenamento, buckets configurados e últimos envios para
-            garantir governança sobre o conteúdo distribuído pela CDN.
+            Acompanhe uso de armazenamento, buckets configurados e últimos
+            envios para garantir governança sobre o conteúdo distribuído pela
+            CDN.
           </p>
           {requiresSetup ? (
             <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
               <AlertCircle className="mt-0.5 h-4 w-4" />
               <p>
-                Configure bucket, região e credenciais em <strong>/settings</strong> para
-                habilitar uploads reais ao S3.
+                Configure bucket, região e credenciais em{" "}
+                <strong>/settings</strong> para habilitar uploads reais ao S3.
               </p>
             </div>
           ) : null}
@@ -148,19 +149,20 @@ export function OverviewDashboard() {
           <CardHeader className="flex items-start justify-between">
             <div>
               <CardDescription>Bucket configurado</CardDescription>
-              <CardTitle className="text-2xl truncate">{data.stats.bucket}</CardTitle>
+              <CardTitle className="text-2xl truncate">
+                {data.stats.bucket}
+              </CardTitle>
             </div>
             <Cloud className="h-6 w-6 text-zinc-400" />
           </CardHeader>
           <CardContent className="space-y-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Status:{" "}
+            <Badge variant={requiresSetup ? "warning" : "success"}>
+              {requiresSetup ? "pendente" : "ativo"}
+            </Badge>
             <p>
-              Status:{" "}
-              <Badge variant={requiresSetup ? "warning" : "success"}>
-                {requiresSetup ? "pendente" : "ativo"}
-              </Badge>
-            </p>
-            <p>
-              Origem CDN: <span className="font-medium">{data.stats.cdnHost}</span>
+              Origem CDN:{" "}
+              <span className="font-medium">{data.stats.cdnHost}</span>
             </p>
           </CardContent>
         </Card>
@@ -182,8 +184,8 @@ export function OverviewDashboard() {
           <CardContent className="grid gap-3">
             {data.recentUploads.length === 0 ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Nenhum upload recente até o momento. Os envios realizados na página de
-                arquivos aparecerão aqui automaticamente.
+                Nenhum upload recente até o momento. Os envios realizados na
+                página de arquivos aparecerão aqui automaticamente.
               </p>
             ) : (
               data.recentUploads.map((upload) => (
@@ -225,8 +227,8 @@ export function OverviewDashboard() {
                   Permissões validadas
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Utilize grupos dedicados por equipe ou projeto para evitar acessos
-                  desnecessários.
+                  Utilize grupos dedicados por equipe ou projeto para evitar
+                  acessos desnecessários.
                 </p>
               </div>
             </div>
@@ -237,8 +239,8 @@ export function OverviewDashboard() {
                   CDN pronta para entrega
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Garanta que o domínio CDN esteja com SSL válido e cabeçalhos de cache
-                  configurados.
+                  Garanta que o domínio CDN esteja com SSL válido e cabeçalhos
+                  de cache configurados.
                 </p>
               </div>
             </div>
@@ -249,8 +251,8 @@ export function OverviewDashboard() {
                   Observabilidade ativa
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Configure alerts (CloudWatch / Grafana) para acompanhar picos de uso ou
-                  alterações inesperadas.
+                  Configure alerts (CloudWatch / Grafana) para acompanhar picos
+                  de uso ou alterações inesperadas.
                 </p>
               </div>
             </div>

@@ -8,17 +8,17 @@ import {
   FileQuestion,
   FileText,
   Folder,
-  FolderOpen,
-  Home,
+  HardDrive,
+  LayoutGrid,
   RefreshCw,
   Search,
   Trash2,
   UploadCloud,
   Video,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -41,7 +41,12 @@ import {
   type UploadItem,
 } from "@/components/dashboard/upload-progress";
 import { type FileRecord, type FilesResponse } from "@/lib/types";
-import { cn, formatBytes, formatDateTime, getFilePreviewType } from "@/lib/utils";
+import {
+  cn,
+  formatBytes,
+  formatDateTime,
+  getFilePreviewType,
+} from "@/lib/utils";
 
 const INITIAL_STATE: FilesResponse = {
   files: [],
@@ -55,8 +60,18 @@ const INITIAL_STATE: FilesResponse = {
   recentUploads: [],
 };
 
-const normalizePrefix = (prefix: string) =>
-  prefix.replace(/^\/+|\/+$/g, "");
+const normalizePrefix = (prefix: string) => prefix.replace(/^\/+|\/+$/g, "");
+
+type ExplorerEntry =
+  | {
+      type: "folder";
+      name: string;
+      itemCount: number;
+    }
+  | {
+      type: "file";
+      file: FileRecord;
+    };
 
 export function FilesWorkspace() {
   const [data, setData] = useState<FilesResponse>(INITIAL_STATE);
@@ -67,11 +82,16 @@ export function FilesWorkspace() {
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [prefixInput, setPrefixInput] = useState("");
-  const [permissionsInput, setPermissionsInput] = useState("");
   const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
+  const [transfersOpen, setTransfersOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const normalizedActivePrefix = useMemo(
+    () => normalizePrefix(activePrefix),
+    [activePrefix],
+  );
+
   const createUploadId = useCallback(() => {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
       return crypto.randomUUID();
@@ -111,11 +131,6 @@ export function FilesWorkspace() {
     fetchData();
   }, [fetchData]);
 
-  const normalizedActivePrefix = useMemo(
-    () => normalizePrefix(activePrefix),
-    [activePrefix],
-  );
-
   useEffect(() => {
     if (!normalizedActivePrefix) return;
     const exists = data.files.some(
@@ -128,37 +143,84 @@ export function FilesWorkspace() {
     }
   }, [data.files, normalizedActivePrefix]);
 
-  useEffect(() => {
-    setPrefixInput(normalizedActivePrefix);
-  }, [normalizedActivePrefix]);
+  const currentFolders = useMemo(() => {
+    const map = new Map<string, number>();
+    const prefix = normalizedActivePrefix ? `${normalizedActivePrefix}/` : "";
 
-  const matchesPrefix = useCallback(
-    (file: FileRecord) => {
-      if (!normalizedActivePrefix) return true;
-      return (
-        file.key === normalizedActivePrefix ||
-        file.key.startsWith(`${normalizedActivePrefix}/`)
-      );
-    },
+    data.files.forEach((file) => {
+      const key = file.key;
+      if (normalizedActivePrefix) {
+        if (!key.startsWith(prefix)) return;
+        const remainder = key.slice(prefix.length);
+        const parts = remainder.split("/").filter(Boolean);
+        if (parts.length > 1) {
+          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
+        }
+      } else {
+        const parts = key.split("/").filter(Boolean);
+        if (parts.length > 1) {
+          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
+        }
+      }
+    });
+
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [data.files, normalizedActivePrefix]);
+
+  const currentFiles = useMemo(() => {
+    const prefix = normalizedActivePrefix ? `${normalizedActivePrefix}/` : "";
+    return data.files.filter((file) => {
+      if (normalizedActivePrefix) {
+        if (!file.key.startsWith(prefix)) return false;
+        const remainder = file.key.slice(prefix.length);
+        return remainder.length > 0 && !remainder.includes("/");
+      }
+
+      return !file.key.includes("/");
+    });
+  }, [data.files, normalizedActivePrefix]);
+
+  const explorerEntries = useMemo<ExplorerEntry[]>(() => {
+    const search = query.trim().toLowerCase();
+
+    const folders = currentFolders
+      .filter((folder) =>
+        search ? folder.name.toLowerCase().includes(search) : true,
+      )
+      .map<ExplorerEntry>((folder) => ({
+        type: "folder",
+        name: folder.name,
+        itemCount: folder.count,
+      }));
+
+    const files = currentFiles
+      .filter((file) => {
+        if (!search) return true;
+        const haystack = [
+          file.fileName,
+          file.key,
+          file.uploadedBy,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(search);
+      })
+      .map<ExplorerEntry>((file) => ({ type: "file", file }));
+
+    return [...folders, ...files];
+  }, [currentFiles, currentFolders, query]);
+
+  const breadcrumbs = useMemo(
+    () => (normalizedActivePrefix ? normalizedActivePrefix.split("/") : []),
     [normalizedActivePrefix],
   );
 
-  const filteredFiles = useMemo(() => {
-    const search = query.trim().toLowerCase();
-    return data.files.filter((file) => {
-      if (!matchesPrefix(file)) return false;
-      if (!search) return true;
-      const haystack = [
-        file.fileName,
-        file.key,
-        file.uploadedBy,
-        file.permissions?.join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(search);
-    });
-  }, [data.files, matchesPrefix, query]);
+  const requiresSetup = useMemo(
+    () => data.stats.bucket.toLowerCase().includes("configure"),
+    [data.stats.bucket],
+  );
 
   const handleFilesUpload = useCallback(
     async (incoming: File[]) => {
@@ -166,8 +228,7 @@ export function FilesWorkspace() {
       setUploading(true);
       setError(null);
 
-      const prefixValue = normalizePrefix(prefixInput);
-      const permissionsValue = permissionsInput.trim();
+      const prefixValue = normalizedActivePrefix;
 
       const queueItems = incoming.map<UploadItem>((file) => ({
         id: createUploadId(),
@@ -186,7 +247,6 @@ export function FilesWorkspace() {
           const formData = new FormData();
           formData.append("file", file);
           if (prefixValue) formData.append("prefix", prefixValue);
-          if (permissionsValue) formData.append("permissions", permissionsValue);
 
           const xhr = new XMLHttpRequest();
           xhr.open("POST", "/api/files");
@@ -238,7 +298,12 @@ export function FilesWorkspace() {
       await fetchData();
       setUploading(false);
     },
-    [createUploadId, fetchData, permissionsInput, prefixInput, updateQueue],
+    [
+      createUploadId,
+      fetchData,
+      normalizedActivePrefix,
+      updateQueue,
+    ],
   );
 
   const handleDelete = async (key: string) => {
@@ -294,11 +359,6 @@ export function FilesWorkspace() {
     }
   };
 
-  const handleBrowseClick = () => {
-    if (requiresSetup) return;
-    fileInputRef.current?.click();
-  };
-
   const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (
     event,
   ) => {
@@ -309,434 +369,351 @@ export function FilesWorkspace() {
     }
   };
 
-  const breadcrumbs = useMemo(
-    () => (normalizedActivePrefix ? normalizedActivePrefix.split("/") : []),
-    [normalizedActivePrefix],
-  );
-
-  const prefixFiles = useMemo(() => {
-    if (!normalizedActivePrefix) return data.files;
-    return data.files.filter((file) =>
-      matchesPrefix(file),
-    );
-  }, [data.files, matchesPrefix, normalizedActivePrefix]);
-
-  const directoryListing = useMemo(() => {
-    if (!prefixFiles.length) return [];
-
-    const map = new Map<string, number>();
-    const normalized =
-      normalizedActivePrefix !== "" ? `${normalizedActivePrefix}/` : "";
-
-    prefixFiles.forEach((file) => {
-      const key = file.key;
-      if (normalizedActivePrefix) {
-        if (!key.startsWith(normalized)) return;
-        const remainder = key.slice(normalized.length);
-        const parts = remainder.split("/").filter(Boolean);
-        if (parts.length > 1) {
-          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
-        }
-      } else {
-        const parts = key.split("/").filter(Boolean);
-        if (parts.length > 1) {
-          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
-        }
-      }
-    });
-
-    return Array.from(map.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [prefixFiles, normalizedActivePrefix]);
-
-  const rootFileCount = useMemo(() => {
-    if (!prefixFiles.length) return 0;
-    if (!normalizedActivePrefix) {
-      return prefixFiles.filter((file) => !file.key.includes("/")).length;
-    }
-
-    return prefixFiles.filter((file) => {
-      if (!file.key.startsWith(`${normalizedActivePrefix}/`)) return false;
-      const remainder = file.key.slice(normalizedActivePrefix.length + 1);
-      return remainder.length > 0 && !remainder.includes("/");
-    }).length;
-  }, [normalizedActivePrefix, prefixFiles]);
-
-  const handleDirectoryClick = (segment: string) => {
-    setActivePrefix((current) => {
-      const base = normalizePrefix(current);
-      return base ? `${base}/${segment}` : segment;
-    });
-  };
-
-  const handleBreadcrumbClick = (index: number) => {
-    if (index < 0) {
-      setActivePrefix("");
-      return;
-    }
-    const target = breadcrumbs.slice(0, index + 1).join("/");
-    setActivePrefix(target);
-  };
-
-  const requiresSetup = useMemo(
-    () => data.stats.bucket.toLowerCase().includes("configure"),
-    [data.stats.bucket],
-  );
+  const openTransfers = () => setTransfersOpen(true);
+  const closeTransfers = () => setTransfersOpen(false);
 
   return (
-    <div className="space-y-10">
-      <section className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium uppercase tracking-[0.3em] text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-            <UploadCloud className="h-4 w-4" />
-            Storage S3
-          </div>
-          <h1 className="text-3xl font-semibold text-zinc-900 dark:text-zinc-50">
-            Biblioteca de arquivos
-          </h1>
-          <p className="max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
-            Arraste arquivos ou navegue entre pastas para gerenciar seu conteúdo no
-            bucket configurado.
-          </p>
-          {requiresSetup ? (
-            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
-              <AlertCircle className="mt-0.5 h-4 w-4" />
-              <p>
-                Configure bucket, região e credenciais em <strong>/settings</strong> para
-                habilitar uploads reais ao S3.
-              </p>
-            </div>
-          ) : null}
-        </div>
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Pesquisar por nome, usuário ou permissão..."
-              className="pl-9"
-            />
-          </div>
-          <Button
-            variant="secondary"
-            onClick={fetchData}
-            disabled={loading}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Atualizar
-          </Button>
-        </div>
-      </section>
+    <div className="relative space-y-6">
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleInputChange}
+        disabled={requiresSetup}
+      />
 
-      <section className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload rápido</CardTitle>
-            <CardDescription>
-              Solte múltiplos arquivos ou escolha manualmente. Prefixo e permissões são
-              opcionais.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={handleBrowseClick}
+      <Card>
+        <CardHeader className="flex flex-col gap-4 border-b border-zinc-200/80 bg-zinc-50/60 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <button
+              type="button"
+              onClick={() => setActivePrefix("")}
               className={cn(
-                "flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50/60 p-10 text-center transition-all dark:border-zinc-700 dark:bg-zinc-900/40",
-                requiresSetup
-                  ? "cursor-not-allowed opacity-60"
-                  : "cursor-pointer hover:border-zinc-400 hover:bg-zinc-100/70 dark:hover:border-zinc-500 dark:hover:bg-zinc-900/70",
-                isDragging && "border-zinc-900 bg-zinc-100/80 dark:border-zinc-200",
+                "inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 transition",
+                normalizedActivePrefix === ""
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900",
               )}
-              role="button"
-              tabIndex={0}
-              aria-disabled={requiresSetup}
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
-                <UploadCloud className="h-5 w-5" />
+              <HardDrive className="h-4 w-4" />
+              Meu Drive
+            </button>
+            {breadcrumbs.map((segment, index) => (
+              <div key={`${segment}-${index}`} className="flex items-center gap-2">
+                <ChevronRight className="h-3 w-3 text-zinc-400" />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActivePrefix(breadcrumbs.slice(0, index + 1).join("/"))
+                  }
+                  className="rounded-full bg-zinc-100 px-3 py-1.5 text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                >
+                  {segment}
+                </button>
               </div>
-              <h3 className="mt-4 text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                {requiresSetup
-                  ? "Finalize a configuração em /settings"
-                  : isDragging
-                    ? "Solte os arquivos para enviar"
-                    : "Arraste e solte arquivos aqui"}
-              </h3>
-              <p className="mt-2 max-w-sm text-xs text-zinc-500 dark:text-zinc-400">
-                {requiresSetup
-                  ? "Bucket e credenciais ainda não foram informados."
-                  : "Limite recomendado de 2 GB por arquivo. Utilize a CDN para compartilhar rapidamente."}
-              </p>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                Biblioteca de arquivos
+              </CardTitle>
+              <CardDescription>
+                {normalizedActivePrefix
+                  ? `Navegando em /${normalizedActivePrefix}`
+                  : "Navegando na raiz do bucket"}
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full min-w-[220px] max-w-xs flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                <Input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Pesquisar arquivos..."
+                  className="rounded-full border-zinc-300 pl-9 text-sm dark:border-zinc-700"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={openTransfers}
+              >
+                <LayoutGrid className="mr-2 h-4 w-4" />
+                Transferências
+              </Button>
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
-                className="mt-4"
+                className="rounded-full"
+                onClick={fetchData}
+                disabled={loading}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Atualizar
+              </Button>
+              <Button
+                type="button"
+                className="rounded-full"
+                onClick={() => {
+                  if (requiresSetup) return;
+                  fileInputRef.current?.click();
+                }}
                 disabled={requiresSetup || uploading}
               >
-                {uploading ? "Enviando..." : "Selecionar arquivos"}
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Novo upload
               </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleInputChange}
-                disabled={requiresSetup}
-              />
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Prefixo (opcional)
-                </label>
-                <Input
-                  value={prefixInput}
-                  onChange={(event) => setPrefixInput(event.target.value)}
-                  placeholder="ex: marketing/campanhas"
-                  disabled={uploading}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Permissões (separadas por vírgula)
-                </label>
-                <Input
-                  value={permissionsInput}
-                  onChange={(event) => setPermissionsInput(event.target.value)}
-                  placeholder="ex: publico, marketing"
-                  disabled={uploading}
-                />
-              </div>
-            </div>
-
-            <UploadProgressList items={uploadQueue.slice(0, 5)} />
-          </CardContent>
-        </Card>
-
-        <Card className="h-full">
-          <CardHeader>
-            <CardTitle>Explorar pastas</CardTitle>
-            <CardDescription>
-              Navegue pelos níveis do bucket para filtrar rapidamente os arquivos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-              <button
-                type="button"
-                onClick={() => handleBreadcrumbClick(-1)}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full border border-transparent px-3 py-1.5 transition",
-                  normalizedActivePrefix === ""
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900",
-                )}
-              >
-                <Home className="h-3.5 w-3.5" />
-                Raiz
-              </button>
-              {breadcrumbs.map((segment, index) => (
-                <div
-                  key={`${segment}-${index}`}
-                  className="flex items-center gap-2"
-                >
-                  <ChevronRight className="h-3 w-3 text-zinc-400" />
-                  <button
-                    type="button"
-                    onClick={() => handleBreadcrumbClick(index)}
-                    className="rounded-full bg-zinc-100 px-3 py-1.5 text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900"
-                  >
-                    {segment}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-200">
-                  Pastas neste nível
-                </span>
-                <Badge variant="outline" className="font-normal">
-                  {directoryListing.length} pasta(s)
-                </Badge>
-              </div>
-              {directoryListing.length ? (
-                <div className="grid gap-2">
-                  {directoryListing.map((dir) => (
-                    <button
-                      key={dir.name}
-                      type="button"
-                      onClick={() => handleDirectoryClick(dir.name)}
-                      className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-                    >
-                      <span className="flex items-center gap-2 text-zinc-700 dark:text-zinc-200">
-                        <Folder className="h-4 w-4" />
-                        {dir.name}
-                      </span>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {dir.count} item(s)
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-4 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-400">
-                  Nenhuma subpasta encontrada neste nível.
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs dark:border-zinc-800 dark:bg-zinc-900/30">
-              <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
-                <FolderOpen className="h-4 w-4" />
-                <span>
-                  {rootFileCount} arquivo(s) diretamente em{" "}
-                  <strong>
-                    {normalizedActivePrefix ? normalizedActivePrefix : "Raiz"}
-                  </strong>
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-              Arquivos no bucket
-            </h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {filteredFiles.length} resultado(s) encontrados
-            </p>
           </div>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-zinc-50/80 uppercase text-xs font-semibold tracking-wider text-zinc-500 dark:bg-zinc-900/50 dark:text-zinc-400">
-                <TableHead className="min-w-[260px]">Arquivo</TableHead>
-                <TableHead>Tamanho</TableHead>
-                <TableHead>Atualizado em</TableHead>
-                <TableHead>Permissões</TableHead>
-                <TableHead className="w-32 text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="py-12 text-center text-sm text-zinc-500"
-                  >
-                    Carregando arquivos...
-                  </TableCell>
-                </TableRow>
-              ) : filteredFiles.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="py-12 text-center text-sm text-zinc-500"
-                  >
-                    Nenhum arquivo encontrado. Ajuste os filtros ou faça upload do
-                    primeiro documento.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredFiles.map((file) => {
-                  const filePreviewType = getFilePreviewType(file.fileName);
-                  const previewUrl = file.cdnUrl || file.url;
-                  return (
-                    <TableRow
-                      key={file.key}
-                      className="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-                            {filePreviewType === "image" ? (
-                              <img
-                                src={previewUrl}
-                                alt={file.fileName}
-                                className="h-full w-full object-cover"
-                                loading="lazy"
-                              />
-                            ) : filePreviewType === "video" ? (
-                              <Video className="h-5 w-5 text-zinc-500" />
-                            ) : filePreviewType === "audio" ? (
-                              <AudioLines className="h-5 w-5 text-zinc-500" />
-                            ) : filePreviewType === "pdf" || filePreviewType === "text" ? (
-                              <FileText className="h-5 w-5 text-zinc-500" />
-                            ) : (
-                              <FileQuestion className="h-5 w-5 text-zinc-500" />
-                            )}
-                          </div>
-                          <div className="max-w-[260px] truncate">
-                            <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
-                              {file.fileName}
-                            </p>
-                            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                              {file.key}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatBytes(file.size)}</TableCell>
-                      <TableCell>{formatDateTime(file.lastModified)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {(file.permissions ?? ["padrão"]).map((permission) => (
-                            <Badge key={permission} variant="outline">
-                              {permission}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button asChild variant="ghost" size="icon">
-                            <a href={file.url} target="_blank" rel="noreferrer">
-                              <Download className="h-4 w-4" />
-                            </a>
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-500 hover:text-red-500"
-                            onClick={() => handleDelete(file.key)}
-                            disabled={deletingKey === file.key}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button asChild variant="outline" size="sm">
-                            <a href={file.cdnUrl} target="_blank" rel="noreferrer">
-                              Abrir CDN
-                            </a>
-                          </Button>
-                        </div>
+        </CardHeader>
+
+        <CardContent
+          className={cn(
+            "relative min-h-[480px] rounded-b-2xl border-2 border-dashed border-transparent bg-gradient-to-br from-white to-zinc-50 p-0 transition dark:from-zinc-950 dark:to-zinc-900",
+            requiresSetup
+              ? "opacity-60"
+              : isDragging
+                ? "border-zinc-500 bg-zinc-50/60 dark:border-zinc-600 dark:from-zinc-900 dark:to-zinc-950"
+                : "border-zinc-200 dark:border-zinc-800",
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {requiresSetup ? (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-50/90 p-6 text-center text-sm text-zinc-600 dark:bg-zinc-900/90 dark:text-zinc-300">
+              <AlertCircle className="h-6 w-6 text-amber-500" />
+              <p>
+                Configure bucket, região e credenciais em{" "}
+                <strong className="font-semibold">/settings</strong> para habilitar uploads reais ao S3.
+              </p>
+            </div>
+          ) : isDragging ? (
+            <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 border border-dashed border-zinc-500 bg-zinc-50/80 text-center text-sm text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900/80 dark:text-zinc-200">
+              <UploadCloud className="h-10 w-10 text-zinc-600 dark:text-zinc-200" />
+              Solte os arquivos aqui para enviar
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-4 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-xs text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+              <span>
+                Bucket:{" "}
+                <strong className="text-zinc-700 dark:text-zinc-100">
+                  {data.stats.bucket}
+                </strong>
+              </span>
+              <span>
+                CDN:{" "}
+                <strong className="text-zinc-700 dark:text-zinc-100">
+                  {data.stats.cdnHost}
+                </strong>
+              </span>
+              <span>
+                Arquivos:{" "}
+                <strong className="text-zinc-700 dark:text-zinc-100">
+                  {data.stats.totalFiles}
+                </strong>
+              </span>
+              <span>
+                Última atualização:{" "}
+                <strong className="text-zinc-700 dark:text-zinc-100">
+                  {formatDateTime(data.stats.lastUpdated)}
+                </strong>
+              </span>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-zinc-50/80 uppercase text-xs font-semibold tracking-wider text-zinc-500 dark:bg-zinc-900/50 dark:text-zinc-400">
+                    <TableHead className="min-w-[240px]">Nome</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Tamanho</TableHead>
+                    <TableHead>Modificado em</TableHead>
+                    <TableHead className="w-24 text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="py-12 text-center text-sm text-zinc-500"
+                      >
+                        Carregando arquivos...
                       </TableCell>
                     </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </section>
+                  ) : explorerEntries.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="py-12 text-center text-sm text-zinc-500"
+                      >
+                        Nenhum item encontrado neste diretório.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    explorerEntries.map((entry) => {
+                      if (entry.type === "folder") {
+                        return (
+                          <TableRow
+                            key={`folder-${entry.name}`}
+                            className="cursor-pointer transition hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
+                            onClick={() =>
+                              setActivePrefix(
+                                normalizePrefix(
+                                  normalizedActivePrefix
+                                    ? `${normalizedActivePrefix}/${entry.name}`
+                                    : entry.name,
+                                ),
+                              )
+                            }
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+                                  <Folder className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                    {entry.name}
+                                  </p>
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    {entry.itemCount} item(s)
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>Pasta</TableCell>
+                            <TableCell>—</TableCell>
+                            <TableCell>—</TableCell>
+                            <TableCell className="text-right text-xs text-zinc-400">
+                              Abrir
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      const { file } = entry;
+                      const previewType = getFilePreviewType(file.fileName);
+                      const previewUrl = file.cdnUrl || file.url;
+                      const deleting = deletingKey === file.key;
+
+                      return (
+                        <TableRow
+                          key={file.key}
+                          className="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                                {previewType === "image" ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={previewUrl}
+                                    alt={file.fileName}
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : previewType === "video" ? (
+                                  <Video className="h-5 w-5 text-zinc-500" />
+                                ) : previewType === "audio" ? (
+                                  <AudioLines className="h-5 w-5 text-zinc-500" />
+                                ) : previewType === "pdf" || previewType === "text" ? (
+                                  <FileText className="h-5 w-5 text-zinc-500" />
+                                ) : (
+                                  <FileQuestion className="h-5 w-5 text-zinc-500" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                  {file.fileName}
+                                </p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  {file.key}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>Arquivo</TableCell>
+                          <TableCell>{formatBytes(file.size)}</TableCell>
+                          <TableCell>{formatDateTime(file.lastModified)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button asChild size="icon" variant="ghost">
+                                <a href={file.url} target="_blank" rel="noreferrer">
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              </Button>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-500"
+                                onClick={() => handleDelete(file.key)}
+                                disabled={deleting}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+        <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
           {error}
         </div>
+      ) : null}
+
+      {transfersOpen ? (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={closeTransfers}
+          />
+          <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-sm border-l border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+              <div>
+                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                  Transferências em andamento
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Acompanhe os últimos uploads enviados pelo painel.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={closeTransfers}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="max-h-[calc(100vh-120px)] overflow-y-auto px-6 py-6">
+              <UploadProgressList items={uploadQueue} />
+              {uploadQueue.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+                  Nenhum upload em andamento no momento.
+                </div>
+              ) : null}
+            </div>
+          </aside>
+        </>
       ) : null}
     </div>
   );

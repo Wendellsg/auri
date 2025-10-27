@@ -42,8 +42,8 @@ function unauthorizedResponse(request: NextRequest) {
 
 async function isOnboardingCompleted(request: NextRequest) {
   const cached = getCachedOnboardingCompleted();
-  if (typeof cached === "boolean") {
-    return cached;
+  if (cached === true) {
+    return true;
   }
 
   const cookieFlag = request.cookies.get("auvp_onboarding")?.value === "1";

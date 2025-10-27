@@ -1,24 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: 240 6% 97%;
-  --foreground: 240 6% 10%;
-  --border: 240 5% 84%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 6% 10%;
-  --muted: 240 4% 92%;
-  --muted-foreground: 240 5% 45%;
+  /* === AURI Light Theme === */
+  --background: 220 14% 96%; /* fundo claro */
+  --foreground: 213 29% 17%; /* texto principal */
+  --border: 220 10% 85%; /* bordas suaves */
+  --card: 0 0% 100%; /* cartões/branco puro */
+  --card-foreground: 213 29% 17%; /* texto em cartões */
+  --muted: 220 10% 92%; /* fundos sutis */
+  --muted-foreground: 213 15% 45%; /* texto secundário */
+  --accent: 45 62% 52%; /* dourado Auri */
   color-scheme: light only;
 }
 
 .dark {
-  --background: 240 6% 6%;
-  --foreground: 0 0% 97%;
-  --border: 240 5% 26%;
-  --card: 240 6% 10%;
-  --card-foreground: 0 0% 97%;
-  --muted: 240 5% 16%;
-  --muted-foreground: 240 5% 70%;
+  /* === AURI Dark Theme === */
+  --background: 220 28% 8%; /* fundo escuro */
+  --foreground: 0 0% 97%; /* texto branco */
+  --border: 220 10% 26%; /* borda discreta */
+  --card: 213 29% 17%; /* cartões azul petróleo */
+  --card-foreground: 0 0% 100%; /* texto nos cartões */
+  --muted: 220 15% 12%; /* áreas secundárias */
+  --muted-foreground: 220 10% 70%; /* texto secundário */
+  --accent: 45 62% 52%; /* dourado Auri */
   color-scheme: dark only;
 }
 
@@ -31,11 +35,17 @@
   * {
     border-color: hsl(var(--border));
   }
+
   body {
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))] antialiased;
   }
 
   ::selection {
-    @apply bg-zinc-900 text-zinc-50;
+    background-color: hsl(var(--accent));
+    color: hsl(var(--background));
+  }
+
+  a {
+    @apply text-[hsl(var(--accent))] hover:opacity-80 transition;
   }
 }

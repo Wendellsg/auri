@@ -17,7 +17,6 @@ const FALLBACK_FILES = [
     size: 4_152_000,
     lastModified: "2024-10-09T15:22:00.000Z",
     uploadedBy: "Ana Oliveira",
-    permissions: ["marketing", "publico"],
     url: "https://example-bucket.s3.amazonaws.com/marketing/campanha-2024.pdf",
   },
   {
@@ -26,7 +25,6 @@ const FALLBACK_FILES = [
     size: 12_512_010,
     lastModified: "2024-10-08T09:10:00.000Z",
     uploadedBy: "Bruno Lima",
-    permissions: ["design", "interno"],
     url: "https://example-bucket.s3.amazonaws.com/design/guias/brandbook-v2.zip",
   },
   {
@@ -35,7 +33,6 @@ const FALLBACK_FILES = [
     size: 82_425_333,
     lastModified: "2024-10-07T21:45:00.000Z",
     uploadedBy: "Camila Santos",
-    permissions: ["marketing", "publico"],
     url: "https://example-bucket.s3.amazonaws.com/videos/lancamento-teaser.mp4",
   },
 ];
@@ -53,7 +50,6 @@ function mapS3Object(object: S3Object, config: Awaited<typeof getStorageSettings
     size: object.Size ?? 0,
     lastModified: object.LastModified?.toISOString() ?? new Date().toISOString(),
     uploadedBy: object.Owner?.DisplayName ?? "Sistema",
-    permissions: object.StorageClass ? [object.StorageClass] : [],
     url,
     cdnUrl: toCdnUrl(url, config?.cdnHost),
   };
@@ -178,11 +174,6 @@ export async function POST(request: Request) {
   }
 
   const prefix = String(formData.get("prefix") ?? "").trim().replace(/^\/|\/$/g, "");
-  const permissionsInput = String(formData.get("permissions") ?? "");
-  const permissions = permissionsInput
-    .split(",")
-    .map((permission) => permission.trim())
-    .filter(Boolean);
 
   const key = [prefix, file.name].filter(Boolean).join("/");
 
@@ -196,9 +187,6 @@ export async function POST(request: Request) {
         Key: key,
         Body: buffer,
         ContentType: file.type || undefined,
-        Metadata: {
-          permissions: permissions.join(","),
-        },
       }),
     );
 
@@ -212,7 +200,6 @@ export async function POST(request: Request) {
           fileName: file.name,
           size: buffer.byteLength,
           lastModified: new Date().toISOString(),
-          permissions,
           url,
           cdnUrl: toCdnUrl(url, settings.cdnHost),
         },

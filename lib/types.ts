@@ -4,7 +4,6 @@ export type FileRecord = {
   size: number;
   lastModified: string;
   uploadedBy?: string;
-  permissions?: string[];
   cdnUrl: string;
   url: string;
   status?: "ativo" | "arquivado";
