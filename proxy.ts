@@ -68,13 +68,8 @@ async function isOnboardingCompleted(request: NextRequest) {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  console.log(
-    "Asset path, skipping middleware:",
-    isAssetPath(pathname),
-    pathname
-  );
 
   if (isAssetPath(pathname)) {
     return NextResponse.next();

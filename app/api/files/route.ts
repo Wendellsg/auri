@@ -13,7 +13,7 @@ import { getStorageSettings } from "@/lib/settings";
 
 function mapS3Object(
   object: S3Object,
-  config: Awaited<typeof getStorageSettings>
+  config: Awaited<ReturnType<typeof getStorageSettings>>
 ) {
   const key = object.Key ?? "arquivo";
   const url =
