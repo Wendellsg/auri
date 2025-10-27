@@ -4,6 +4,7 @@ import {
   AlertCircle,
   AudioLines,
   ChevronRight,
+  Copy,
   Download,
   FileQuestion,
   FileText,
@@ -730,6 +731,15 @@ export function FilesWorkspace() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                onClick={() =>
+                                  navigator.clipboard.writeText(previewUrl)
+                                }
+                                size="icon"
+                                variant="ghost"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
                               <Button asChild size="icon" variant="ghost">
                                 <a
                                   href={previewUrl}
