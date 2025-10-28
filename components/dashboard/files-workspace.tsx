@@ -20,10 +20,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { PermissionGate } from "@/components/auth/PermissionGate";
 import {
   UploadProgressList,
   type UploadItem,
 } from "@/components/dashboard/upload-progress";
+import { useSession, type SessionUser } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -78,7 +80,11 @@ type ExplorerEntry =
       file: FileRecord;
     };
 
-export function FilesWorkspace() {
+type FilesWorkspaceContentProps = {
+  session: SessionUser | null;
+};
+
+function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const [data, setData] = useState<FilesResponse>(INITIAL_STATE);
   const [query, setQuery] = useState("");
   const [activePrefix, setActivePrefix] = useState("");
@@ -89,6 +95,10 @@ export function FilesWorkspace() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
   const [transfersOpen, setTransfersOpen] = useState(false);
+
+  const userPermissions = session?.permissions ?? [];
+  const canUpload = userPermissions.includes("upload");
+  const canDelete = userPermissions.includes("delete");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const queueRef = useRef<UploadItem[]>([]);
@@ -241,6 +251,10 @@ export function FilesWorkspace() {
   const handleFilesUpload = useCallback(
     async (incoming: File[]) => {
       if (!incoming.length) return;
+      if (!canUpload) {
+        setError("Você não possui permissão para enviar arquivos.");
+        return;
+      }
       setUploading(true);
       setError(null);
 
@@ -380,10 +394,14 @@ export function FilesWorkspace() {
       await fetchData();
       setUploading(false);
     },
-    [createUploadId, fetchData, normalizedActivePrefix, updateQueue]
+    [canUpload, createUploadId, fetchData, normalizedActivePrefix, updateQueue]
   );
 
   const handleDelete = async (key: string) => {
+    if (!canDelete) {
+      setError("Você não possui permissão para remover arquivos.");
+      return;
+    }
     const confirmation = window.confirm(
       "Tem certeza que deseja remover este arquivo do bucket?"
     );
@@ -420,18 +438,19 @@ export function FilesWorkspace() {
 
   const handleDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault();
-    if (requiresSetup) return;
+    if (requiresSetup || !canUpload) return;
     setIsDragging(true);
   };
 
   const handleDragLeave: React.DragEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault();
+    if (!canUpload) return;
     setIsDragging(false);
   };
 
   const handleDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault();
-    if (requiresSetup) return;
+    if (requiresSetup || !canUpload) return;
     setIsDragging(false);
     const incoming = Array.from(event.dataTransfer?.files ?? []);
     if (incoming.length) {
@@ -442,6 +461,11 @@ export function FilesWorkspace() {
   const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (
     event
   ) => {
+    if (!canUpload) {
+      setError("Você não possui permissão para enviar arquivos.");
+      event.target.value = "";
+      return;
+    }
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (files.length) {
@@ -537,18 +561,34 @@ export function FilesWorkspace() {
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Atualizar
               </Button>
-              <Button
-                type="button"
-                className="rounded-full"
-                onClick={() => {
-                  if (requiresSetup) return;
-                  fileInputRef.current?.click();
-                }}
-                disabled={requiresSetup || uploading}
+              <PermissionGate
+                session={session}
+                permissions="upload"
+                fallback={
+                  <Button
+                    type="button"
+                    className="rounded-full"
+                    disabled
+                    title="Você não possui permissão para enviar arquivos."
+                  >
+                    <UploadCloud className="mr-2 h-4 w-4" />
+                    Novo upload
+                  </Button>
+                }
               >
-                <UploadCloud className="mr-2 h-4 w-4" />
-                Novo upload
-              </Button>
+                <Button
+                  type="button"
+                  className="rounded-full"
+                  onClick={() => {
+                    if (requiresSetup) return;
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={requiresSetup || uploading}
+                >
+                  <UploadCloud className="mr-2 h-4 w-4" />
+                  Novo upload
+                </Button>
+              </PermissionGate>
             </div>
           </div>
         </CardHeader>
@@ -609,6 +649,12 @@ export function FilesWorkspace() {
                 </strong>
               </span>
             </div>
+            {!canUpload ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+                Seu usuário possui acesso somente de leitura. Solicite a
+                permissão <strong>upload</strong> para enviar arquivos.
+              </div>
+            ) : null}
 
             <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
               <Table>
@@ -731,15 +777,20 @@ export function FilesWorkspace() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              <Button
-                                onClick={() =>
-                                  navigator.clipboard.writeText(previewUrl)
-                                }
-                                size="icon"
-                                variant="ghost"
+                              <PermissionGate
+                                session={session}
+                                permissions="compartilhar"
                               >
-                                <Copy className="h-4 w-4" />
-                              </Button>
+                                <Button
+                                  onClick={() =>
+                                    navigator.clipboard.writeText(previewUrl)
+                                  }
+                                  size="icon"
+                                  variant="ghost"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </PermissionGate>
                               <Button asChild size="icon" variant="ghost">
                                 <a
                                   href={previewUrl}
@@ -749,16 +800,18 @@ export function FilesWorkspace() {
                                   <Download className="h-4 w-4" />
                                 </a>
                               </Button>
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="text-red-500 hover:text-red-500"
-                                onClick={() => handleDelete(file.key)}
-                                disabled={deleting}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <PermissionGate session={session} permissions="delete">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="text-red-500 hover:text-red-500"
+                                  onClick={() => handleDelete(file.key)}
+                                  disabled={deleting}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </PermissionGate>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -812,5 +865,26 @@ export function FilesWorkspace() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export function FilesWorkspace() {
+  const session = useSession();
+
+  const noVisualPermissionFallback = (
+    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+      Você não possui permissão para visualizar os arquivos deste workspace.
+      Solicite ao administrador o acesso <strong>visualizar</strong>.
+    </div>
+  );
+
+  return (
+    <PermissionGate
+      session={session}
+      permissions="visualizar"
+      fallback={noVisualPermissionFallback}
+    >
+      <FilesWorkspaceContent session={session} />
+    </PermissionGate>
   );
 }

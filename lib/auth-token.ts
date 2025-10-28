@@ -5,6 +5,7 @@ export type AuthSession = {
   email: string;
   name: string;
   role: "admin" | "editor" | "viewer";
+  permissions: string[];
 };
 
 export const SESSION_COOKIE = "auri_session";

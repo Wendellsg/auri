@@ -23,8 +23,6 @@ export async function authenticateUser(email: string, password: string) {
     where: { email: email.toLowerCase() },
   });
 
-  console.log(user);
-
   if (!user) return null;
   if (user.status === "blocked") return null;
   if (!verifyPassword(password, user.passwordHash)) return null;
@@ -42,6 +40,7 @@ export async function authenticateUser(email: string, password: string) {
     email: user.email,
     name: user.name,
     role: user.role,
+    permissions: user.permissions ?? [],
   } satisfies AuthSession;
 }
 
@@ -71,7 +70,13 @@ export async function getSessionFromCookies() {
   const token = (await cookieStore).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    return await verifyToken(token);
+    const session = await verifyToken(token);
+    return {
+      ...session,
+      permissions: Array.isArray(session.permissions)
+        ? session.permissions
+        : [],
+    };
   } catch {
     return null;
   }
@@ -83,7 +88,13 @@ export async function requireSession(request: NextRequest) {
     return null;
   }
   try {
-    return await verifyToken(token);
+    const session = await verifyToken(token);
+    return {
+      ...session,
+      permissions: Array.isArray(session.permissions)
+        ? session.permissions
+        : [],
+    };
   } catch {
     return null;
   }

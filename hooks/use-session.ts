@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-type SessionUser = {
+export type SessionUser = {
   name: string;
   email: string;
   role: "admin" | "editor" | "viewer";
+  permissions: string[];
 };
 
 export function useSession() {
@@ -17,7 +18,16 @@ export function useSession() {
       .then(async (response) => {
         if (!response.ok) return null;
         const data = await response.json();
-        return data.user as SessionUser;
+        const sessionUser = data.user as Partial<SessionUser> | null;
+        if (!sessionUser) return null;
+        return {
+          name: sessionUser.name ?? "",
+          email: sessionUser.email ?? "",
+          role: sessionUser.role ?? "viewer",
+          permissions: Array.isArray(sessionUser.permissions)
+            ? sessionUser.permissions
+            : [],
+        };
       })
       .then((sessionUser) => {
         if (subscribed) setUser(sessionUser);
