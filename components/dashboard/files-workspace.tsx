@@ -18,15 +18,11 @@ import {
   Trash2,
   UploadCloud,
   Video,
-  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PermissionGate } from "@/components/auth/PermissionGate";
-import {
-  UploadProgressList,
-  type UploadItem,
-} from "@/components/dashboard/upload-progress";
+import { useUploadManager } from "@/components/dashboard/upload-manager";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -54,17 +50,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSession, type SessionUser } from "@/hooks/use-session";
-import {
-  type FileRecord,
-  type FilesResponse,
-  type PresignedUploadResponse,
-} from "@/lib/types";
+import { type FileRecord, type FilesResponse } from "@/lib/types";
 import {
   cn,
   formatBytes,
   formatDateTime,
   getFilePreviewType,
-  type FilePreviewType,
 } from "@/lib/utils";
 
 const INITIAL_STATE: FilesResponse = {
@@ -80,45 +71,6 @@ const INITIAL_STATE: FilesResponse = {
 };
 
 const normalizePrefix = (prefix: string) => prefix.replace(/^\/+|\/+$/g, "");
-
-const ONE_MB = 1024 * 1024;
-const LARGE_UPLOAD_THRESHOLDS: Record<FilePreviewType | "default", number> = {
-  image: 3 * ONE_MB,
-  video: 200 * ONE_MB,
-  audio: 120 * ONE_MB,
-  pdf: 60 * ONE_MB,
-  text: 10 * ONE_MB,
-  other: 80 * ONE_MB,
-  default: 80 * ONE_MB,
-};
-
-const typeLabelMap: Record<FilePreviewType, string> = {
-  image: "imagem",
-  video: "vídeo",
-  audio: "áudio",
-  pdf: "documento",
-  text: "arquivo de texto",
-  other: "arquivo",
-};
-
-const shouldRequestUploadConfirmation = (file: File) => {
-  const previewType = getFilePreviewType(file.name);
-  const threshold =
-    LARGE_UPLOAD_THRESHOLDS[previewType] ?? LARGE_UPLOAD_THRESHOLDS.default;
-  if (file.size < threshold) {
-    return { required: false, previewType };
-  }
-
-  const sizeLabel = formatBytes(file.size);
-  const thresholdLabel = formatBytes(threshold);
-  const typeLabel = typeLabelMap[previewType] ?? "arquivo";
-
-  return {
-    required: true,
-    previewType,
-    message: `Este ${typeLabel} possui ${sizeLabel} e ultrapassa o limite de upload automático (${thresholdLabel}). Confirme para iniciar o envio.`,
-  };
-};
 
 type ExplorerEntry =
   | {
@@ -140,24 +92,20 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const [query, setQuery] = useState("");
   const [activePrefix, setActivePrefix] = useState("");
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
-  const [transfersOpen, setTransfersOpen] = useState(false);
 
   const userPermissions = session?.permissions ?? [];
   const canUpload = userPermissions.includes("upload");
   const canDelete = userPermissions.includes("delete");
 
+  const { enqueueUploads, openPanel, isUploading } = useUploadManager();
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const queueRef = useRef<UploadItem[]>([]);
-  const pendingFilesRef = useRef<Map<string, File>>(new Map());
-  const activeUploadsRef = useRef(0);
 
   const normalizedActivePrefix = useMemo(
     () => normalizePrefix(activePrefix),
@@ -178,23 +126,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
           .filter(Boolean)
           .join("/")}`
       : null;
-
-  const createUploadId = useCallback(() => {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-      return crypto.randomUUID();
-    }
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }, []);
-
-  const updateQueue = useCallback((id: string, patch: Partial<UploadItem>) => {
-    setUploadQueue((prev) => {
-      const next = prev.map((item) =>
-        item.id === id ? { ...item, ...patch } : item
-      );
-      queueRef.current = next;
-      return next;
-    });
-  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -221,20 +152,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  useEffect(() => {
-    queueRef.current = uploadQueue;
-  }, [uploadQueue]);
-
-  useEffect(() => {
-    return () => {
-      queueRef.current.forEach((item) => {
-        if (item.previewUrl) {
-          URL.revokeObjectURL(item.previewUrl);
-        }
-      });
-    };
-  }, []);
 
   useEffect(() => {
     if (!normalizedActivePrefix) return;
@@ -360,116 +277,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     [data.stats.bucket]
   );
 
-  const startUploadForItem = useCallback(
-    async (itemId: string) => {
-      const queueItem = queueRef.current.find((item) => item.id === itemId);
-      const file = pendingFilesRef.current.get(itemId);
-
-      if (!queueItem || !file) {
-        return;
-      }
-
-      if (queueItem.status === "uploading" || queueItem.status === "success") {
-        return;
-      }
-
-      updateQueue(itemId, {
-        status: "uploading",
-        progress: 0,
-        error: undefined,
-      });
-
-      activeUploadsRef.current += 1;
-      setUploading(true);
-
-      try {
-        const response = await fetch("/api/files", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            prefix: queueItem.targetPrefix || undefined,
-            size: file.size,
-          }),
-        });
-
-        if (!response.ok) {
-          const message = await response.text();
-          throw new Error(
-            message || "Falha ao preparar upload. Verifique as configurações."
-          );
-        }
-
-        const presignData =
-          (await response.json()) as PresignedUploadResponse | null;
-
-        if (!presignData) {
-          throw new Error(
-            "Não foi possível preparar os dados de upload. Tente novamente."
-          );
-        }
-
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", presignData.uploadUrl);
-          xhr.withCredentials = false;
-
-          Object.entries(presignData.headers ?? {}).forEach(
-            ([header, value]) => {
-              if (value) {
-                xhr.setRequestHeader(header, value);
-              }
-            }
-          );
-
-          xhr.upload.onprogress = (event) => {
-            if (!event.lengthComputable) return;
-            const percent = (event.loaded / event.total) * 100;
-            updateQueue(itemId, { progress: percent });
-          };
-
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 400) {
-              resolve();
-            } else {
-              const message =
-                xhr.responseText ||
-                "Falha no upload para o bucket. Verifique as permissões de CORS.";
-              reject(new Error(message));
-            }
-          };
-
-          xhr.onerror = () => {
-            reject(
-              new Error("Erro de conexão durante o upload para o bucket.")
-            );
-          };
-
-          xhr.send(file);
-        });
-
-        updateQueue(itemId, { status: "success", progress: 100 });
-        await fetchData();
-      } catch (err) {
-        console.error(err);
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Ocorreu um erro inesperado ao enviar o arquivo.";
-        updateQueue(itemId, { status: "error", error: message });
-        setError(message);
-      } finally {
-        pendingFilesRef.current.delete(itemId);
-        activeUploadsRef.current = Math.max(activeUploadsRef.current - 1, 0);
-        if (activeUploadsRef.current === 0) {
-          setUploading(false);
-        }
-      }
-    },
-    [fetchData, updateQueue]
-  );
-
   const handleCreateFolder = useCallback(async () => {
     if (!canUpload) {
       setError("Você não possui permissão para criar pastas.");
@@ -590,65 +397,19 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
       setError(null);
 
-      const queueItems = incoming.map<UploadItem>((file) => {
-        const previewUrl = file.type.startsWith("image/")
-          ? URL.createObjectURL(file)
-          : undefined;
-        const confirmation = shouldRequestUploadConfirmation(file);
-        return {
-          id: createUploadId(),
-          fileName: file.name,
-          progress: 0,
-          status: confirmation.required ? "awaiting_confirmation" : "pending",
-          previewUrl,
-          mimeType: file.type || undefined,
-          size: file.size,
-          requiresConfirmation: confirmation.required,
-          confirmationMessage: confirmation.message,
-          targetPrefix: normalizedActivePrefix || undefined,
-        };
+      enqueueUploads(incoming, {
+        prefix: normalizedActivePrefix || undefined,
+        onSuccess: async () => {
+          await fetchData();
+        },
+        onError: (message) => {
+          setError(message);
+        },
       });
 
-      setUploadQueue((prev) => {
-        const next = [
-          ...queueItems,
-          ...prev.filter((item) => item.status !== "success"),
-        ];
-
-        prev.forEach((item) => {
-          if (
-            item.previewUrl &&
-            !next.some((nextItem) => nextItem.id === item.id)
-          ) {
-            URL.revokeObjectURL(item.previewUrl);
-          }
-        });
-
-        queueRef.current = next;
-
-        return next;
-      });
-
-      queueItems.forEach((item, index) => {
-        pendingFilesRef.current.set(item.id, incoming[index]);
-      });
-
-      setTransfersOpen(true);
-
-      queueItems
-        .filter((item) => !item.requiresConfirmation)
-        .forEach((item) => {
-          void startUploadForItem(item.id);
-        });
+      openPanel();
     },
-    [canUpload, createUploadId, normalizedActivePrefix, startUploadForItem]
-  );
-
-  const handleConfirmUpload = useCallback(
-    (itemId: string) => {
-      void startUploadForItem(itemId);
-    },
-    [startUploadForItem]
+    [canUpload, enqueueUploads, normalizedActivePrefix, fetchData, openPanel]
   );
 
   const handleDelete = async (key: string) => {
@@ -708,7 +469,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     setIsDragging(false);
     const incoming = Array.from(event.dataTransfer?.files ?? []);
     if (incoming.length) {
-      void handleFilesUpload(incoming);
+      handleFilesUpload(incoming);
     }
   };
 
@@ -723,12 +484,9 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (files.length) {
-      void handleFilesUpload(files);
+      handleFilesUpload(files);
     }
   };
-
-  const openTransfers = () => setTransfersOpen(true);
-  const closeTransfers = () => setTransfersOpen(false);
 
   return (
     <div className="relative space-y-6">
@@ -800,7 +558,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                 type="button"
                 variant="outline"
                 className="rounded-full"
-                onClick={openTransfers}
+                onClick={openPanel}
               >
                 <LayoutGrid className="mr-2 h-4 w-4" />
                 Transferências
@@ -950,7 +708,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                     if (requiresSetup) return;
                     fileInputRef.current?.click();
                   }}
-                  disabled={requiresSetup || uploading}
+                  disabled={requiresSetup || isUploading}
                 >
                   <UploadCloud className="mr-2 h-4 w-4" />
                   Novo upload
@@ -1198,43 +956,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       {error ? (
         <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
           {error}
-        </div>
-      ) : null}
-
-      {transfersOpen ? (
-        <div className="fixed bottom-6 right-6 z-50 w-full max-w-md animate-in fade-in slide-in-from-bottom-4">
-          <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="mb-3 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                  Transferências em andamento
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Acompanhe os últimos uploads enviados pelo painel.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={closeTransfers}
-                className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="max-h-72 overflow-y-auto pr-1">
-              <UploadProgressList
-                items={uploadQueue}
-                onConfirmUpload={handleConfirmUpload}
-              />
-              {uploadQueue.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-200 p-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-                  Nenhum upload em andamento no momento.
-                </div>
-              ) : null}
-            </div>
-          </div>
         </div>
       ) : null}
     </div>

@@ -3,6 +3,7 @@
 import {
   History,
   LayoutDashboard,
+  LayoutGrid,
   Menu,
   Settings2,
   ShieldCheck,
@@ -15,6 +16,7 @@ import { useMemo, useState } from "react";
 import { UserMenu } from "@/components/layout/user-menu";
 import { OnboardingAlert } from "@/components/onboarding/onboarding-alert";
 import { Button } from "@/components/ui/button";
+import { useUploadManager } from "@/components/dashboard/upload-manager";
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +24,12 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const session = useSession();
+  const { openPanel, queue } = useUploadManager();
+
+  const hasActiveTransfers = useMemo(
+    () => queue.some((item) => item.status !== "success" && item.status !== "error"),
+    [queue]
+  );
 
   const routes = useMemo(() => {
     const base = [
@@ -82,6 +90,22 @@ export function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={openPanel}
+            className={cn(
+              "relative text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
+              hasActiveTransfers ? "text-zinc-900 dark:text-zinc-100" : undefined
+            )}
+            title="Transferências em andamento"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            {hasActiveTransfers ? (
+              <span className="absolute right-1 top-1 block h-2 w-2 rounded-full bg-amber-500" />
+            ) : null}
+          </Button>
           <UserMenu />
           <Button
             size="icon"
