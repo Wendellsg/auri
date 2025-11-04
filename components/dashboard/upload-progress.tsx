@@ -1,25 +1,45 @@
 "use client";
 
 import Image from "next/image";
-import { Check, Loader2, XCircle, File as FileIcon } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  XCircle,
+  File as FileIcon,
+  ShieldAlert,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export type UploadItem = {
   id: string;
   fileName: string;
   progress: number;
-  status: "pending" | "uploading" | "success" | "error";
+  status:
+    | "awaiting_confirmation"
+    | "pending"
+    | "uploading"
+    | "success"
+    | "error";
   error?: string;
   previewUrl?: string;
   mimeType?: string;
+  size?: number;
+  requiresConfirmation?: boolean;
+  confirmationMessage?: string;
+  targetPrefix?: string;
 };
 
 type UploadProgressListProps = {
   items: UploadItem[];
+  onConfirmUpload?: (itemId: string) => void;
 };
 
-export function UploadProgressList({ items }: UploadProgressListProps) {
+export function UploadProgressList({
+  items,
+  onConfirmUpload,
+}: UploadProgressListProps) {
   if (!items.length) return null;
 
   return (
@@ -60,7 +80,9 @@ export function UploadProgressList({ items }: UploadProgressListProps) {
                       ? "Upload concluído"
                       : item.status === "error"
                         ? "Erro ao enviar"
-                        : "Enviando..."}
+                        : item.status === "awaiting_confirmation"
+                          ? "Aguardando confirmação"
+                          : "Enviando..."}
                   </span>
                 </div>
                 <div className="mt-1">
@@ -68,6 +90,8 @@ export function UploadProgressList({ items }: UploadProgressListProps) {
                     <Check className="h-4 w-4 text-emerald-500" />
                   ) : item.status === "error" ? (
                     <XCircle className="h-4 w-4 text-red-500" />
+                  ) : item.status === "awaiting_confirmation" ? (
+                    <ShieldAlert className="h-4 w-4 text-amber-500" />
                   ) : (
                     <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
                   )}
@@ -89,6 +113,21 @@ export function UploadProgressList({ items }: UploadProgressListProps) {
             </div>
             {item.error ? (
               <p className="mt-2 text-[11px] text-red-500">{item.error}</p>
+            ) : null}
+            {item.status === "awaiting_confirmation" ? (
+              <div className="mt-3 space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200">
+                <p>{item.confirmationMessage ?? "Confirme para iniciar o upload."}</p>
+                {onConfirmUpload ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 rounded-full"
+                    onClick={() => onConfirmUpload(item.id)}
+                  >
+                    Confirmar envio
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         );
