@@ -16,6 +16,9 @@ function mapS3Object(
   config: Awaited<ReturnType<typeof getStorageSettings>>
 ) {
   const key = object.Key ?? "arquivo";
+  const segments = key.split("/").filter(Boolean);
+  const fileName = segments.length ? segments[segments.length - 1] : key;
+  const isFolderPlaceholder = key.endsWith("/");
   const url =
     config && key
       ? buildS3Url(config, key)
@@ -23,13 +26,14 @@ function mapS3Object(
 
   return {
     key,
-    fileName: key.split("/").pop() ?? key,
+    fileName,
     size: object.Size ?? 0,
     lastModified:
       object.LastModified?.toISOString() ?? new Date().toISOString(),
     uploadedBy: object.Owner?.DisplayName ?? "Sistema",
     url,
     cdnUrl: toCdnUrl(url, config?.cdnHost),
+    isFolderPlaceholder,
   };
 }
 
@@ -71,17 +75,23 @@ export async function GET() {
           new Date(b.lastModified).getTime() -
           new Date(a.lastModified).getTime()
       );
+    const nonPlaceholderFiles = files.filter(
+      (file) => !file.isFolderPlaceholder
+    );
 
     return NextResponse.json({
       files,
       stats: {
-        totalFiles: files.length,
-        totalSize: files.reduce((acc, curr) => acc + curr.size, 0),
+        totalFiles: nonPlaceholderFiles.length,
+        totalSize: nonPlaceholderFiles.reduce(
+          (acc, curr) => acc + curr.size,
+          0
+        ),
         lastUpdated: new Date().toISOString(),
         bucket: settings.bucketName,
         cdnHost: settings.cdnHost || "não configurado",
       },
-      recentUploads: files.slice(0, 5).map((file) => ({
+      recentUploads: nonPlaceholderFiles.slice(0, 5).map((file) => ({
         id: file.key,
         fileName: file.fileName,
         uploadedAt: file.lastModified,

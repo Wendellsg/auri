@@ -8,6 +8,7 @@ export type FileRecord = {
   url: string;
   status?: "ativo" | "arquivado";
   contentType?: string;
+  isFolderPlaceholder?: boolean;
 };
 
 export type FilesResponse = {

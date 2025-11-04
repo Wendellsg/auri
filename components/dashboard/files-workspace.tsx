@@ -9,8 +9,10 @@ import {
   FileQuestion,
   FileText,
   Folder,
+  FolderPlus,
   HardDrive,
   LayoutGrid,
+  Loader2,
   RefreshCw,
   Search,
   Trash2,
@@ -34,6 +36,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -94,6 +105,9 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const [transfersOpen, setTransfersOpen] = useState(false);
 
   const userPermissions = session?.permissions ?? [];
@@ -107,6 +121,21 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     () => normalizePrefix(activePrefix),
     [activePrefix]
   );
+
+  const trimmedFolderName = newFolderName.trim();
+  const normalizedFolderName =
+    trimmedFolderName.length > 0
+      ? trimmedFolderName.replace(/\s{2,}/g, " ")
+      : "";
+  const currentFolderPathLabel = normalizedActivePrefix
+    ? `/${normalizedActivePrefix}`
+    : "/";
+  const previewFolderPath =
+    normalizedFolderName.length > 0
+      ? `/${[normalizedActivePrefix, normalizedFolderName]
+          .filter(Boolean)
+          .join("/")}`
+      : null;
 
   const createUploadId = useCallback(() => {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -175,23 +204,57 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
   const currentFolders = useMemo(() => {
     const map = new Map<string, number>();
-    const prefix = normalizedActivePrefix ? `${normalizedActivePrefix}/` : "";
+    const prefixSegments = normalizedActivePrefix
+      ? normalizedActivePrefix.split("/").filter(Boolean)
+      : [];
 
     data.files.forEach((file) => {
-      const key = file.key;
-      if (normalizedActivePrefix) {
-        if (!key.startsWith(prefix)) return;
-        const remainder = key.slice(prefix.length);
-        const parts = remainder.split("/").filter(Boolean);
-        if (parts.length > 1) {
-          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
+      const normalizedKey = normalizePrefix(file.key);
+      if (!normalizedKey) return;
+
+      const segments = normalizedKey.split("/").filter(Boolean);
+      if (!segments.length) return;
+
+      if (prefixSegments.length) {
+        if (segments.length <= prefixSegments.length) {
+          return;
         }
-      } else {
-        const parts = key.split("/").filter(Boolean);
-        if (parts.length > 1) {
-          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
+
+        const matches = prefixSegments.every(
+          (segment, index) => segments[index] === segment
+        );
+        if (!matches) return;
+
+        const relativeSegments = segments.slice(prefixSegments.length);
+        const folderName = relativeSegments[0];
+        if (!folderName) return;
+
+        if (relativeSegments.length === 1) {
+          if (file.isFolderPlaceholder) {
+            if (!map.has(folderName)) {
+              map.set(folderName, 0);
+            }
+          }
+          return;
         }
+
+        map.set(folderName, (map.get(folderName) ?? 0) + 1);
+        return;
       }
+
+      const folderName = segments[0];
+      if (!folderName) return;
+
+      if (segments.length === 1) {
+        if (file.isFolderPlaceholder) {
+          if (!map.has(folderName)) {
+            map.set(folderName, 0);
+          }
+        }
+        return;
+      }
+
+      map.set(folderName, (map.get(folderName) ?? 0) + 1);
     });
 
     return Array.from(map.entries())
@@ -202,6 +265,9 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const currentFiles = useMemo(() => {
     const prefix = normalizedActivePrefix ? `${normalizedActivePrefix}/` : "";
     return data.files.filter((file) => {
+      if (file.isFolderPlaceholder) {
+        return false;
+      }
       if (normalizedActivePrefix) {
         if (!file.key.startsWith(prefix)) return false;
         const remainder = file.key.slice(prefix.length);
@@ -247,6 +313,116 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     () => data.stats.bucket.toLowerCase().includes("configure"),
     [data.stats.bucket]
   );
+
+  const handleCreateFolder = useCallback(async () => {
+    if (!canUpload) {
+      setError("Você não possui permissão para criar pastas.");
+      return;
+    }
+    if (requiresSetup) {
+      setError(
+        "Configure a integração com o storage antes de criar novas pastas."
+      );
+      return;
+    }
+
+    if (!trimmedFolderName) {
+      setError("Informe um nome para a nova pasta.");
+      return;
+    }
+
+    if (/[\\/]/.test(trimmedFolderName)) {
+      setError("O nome da pasta não pode conter barras.");
+      return;
+    }
+
+    const duplicateFolder = currentFolders.some(
+      (folder) =>
+        folder.name.toLowerCase() === normalizedFolderName.toLowerCase()
+    );
+    if (duplicateFolder) {
+      setError("Já existe uma pasta com este nome neste nível.");
+      return;
+    }
+
+    const folderKey = [normalizedActivePrefix, normalizedFolderName]
+      .filter(Boolean)
+      .join("/");
+
+    const conflictingFile = data.files.some((file) => {
+      if (file.isFolderPlaceholder) return false;
+      return normalizePrefix(file.key) === normalizePrefix(folderKey);
+    });
+    if (conflictingFile) {
+      setError(
+        "Já existe um arquivo com este nome neste nível. Escolha outro nome."
+      );
+      return;
+    }
+
+    setCreatingFolder(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/files/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderName: normalizedFolderName,
+          prefix: normalizedActivePrefix || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        let message = "Não foi possível criar a pasta.";
+        try {
+          const json = (await response.json()) as { message?: string };
+          if (json?.message) {
+            message = json.message;
+          }
+        } catch {
+          try {
+            const text = await response.text();
+            if (text) {
+              message = text;
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+
+        setError(message);
+        return;
+      }
+
+      const nextPrefix = normalizePrefix(
+        [normalizedActivePrefix, normalizedFolderName].filter(Boolean).join("/")
+      );
+
+      setNewFolderName("");
+      setCreateFolderOpen(false);
+      setActivePrefix(nextPrefix);
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ocorreu um erro inesperado ao criar a pasta."
+      );
+    } finally {
+      setCreatingFolder(false);
+    }
+  }, [
+    canUpload,
+    currentFolders,
+    data.files,
+    fetchData,
+    trimmedFolderName,
+    normalizedActivePrefix,
+    normalizedFolderName,
+    requiresSetup,
+  ]);
 
   const handleFilesUpload = useCallback(
     async (incoming: File[]) => {
@@ -561,6 +737,119 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Atualizar
               </Button>
+              <PermissionGate
+                session={session}
+                permissions="upload"
+                fallback={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled
+                    title="Você não possui permissão para criar pastas."
+                  >
+                    <FolderPlus className="mr-2 h-4 w-4" />
+                    Nova pasta
+                  </Button>
+                }
+              >
+                <Dialog
+                  open={createFolderOpen}
+                  onOpenChange={(open) => {
+                    setCreateFolderOpen(open);
+                    if (!open) {
+                      setNewFolderName("");
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={requiresSetup}
+                    >
+                      <FolderPlus className="mr-2 h-4 w-4" />
+                      Nova pasta
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void handleCreateFolder();
+                      }}
+                      className="space-y-4"
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Nova pasta</DialogTitle>
+                        <DialogDescription>
+                          {normalizedActivePrefix
+                            ? `A pasta será criada dentro de /${normalizedActivePrefix}.`
+                            : "A pasta será criada na raiz do bucket."}
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+                        <p className="font-medium text-zinc-700 dark:text-zinc-200">
+                          Local de criação
+                        </p>
+                        <p className="mt-1 font-mono text-sm text-zinc-900 dark:text-zinc-100">
+                          {currentFolderPathLabel}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Input
+                          value={newFolderName}
+                          onChange={(event) =>
+                            setNewFolderName(event.target.value)
+                          }
+                          placeholder="Nome da pasta"
+                          className="rounded-full border-zinc-300 text-sm dark:border-zinc-700"
+                          disabled={creatingFolder}
+                          autoFocus
+                        />
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Evite caracteres especiais e mantenha o nome curto.
+                        </p>
+                        {previewFolderPath ? (
+                          <p className="font-mono text-xs text-zinc-600 dark:text-zinc-300">
+                            Caminho final: {previewFolderPath}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="rounded-full"
+                          onClick={() => {
+                            setCreateFolderOpen(false);
+                            setNewFolderName("");
+                          }}
+                          disabled={creatingFolder}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="submit"
+                          className="rounded-full"
+                          disabled={creatingFolder}
+                        >
+                          {creatingFolder ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <FolderPlus className="mr-2 h-4 w-4" />
+                          )}
+                          Criar pasta
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </PermissionGate>
               <PermissionGate
                 session={session}
                 permissions="upload"
