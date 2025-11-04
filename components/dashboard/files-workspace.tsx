@@ -83,7 +83,7 @@ const normalizePrefix = (prefix: string) => prefix.replace(/^\/+|\/+$/g, "");
 
 const ONE_MB = 1024 * 1024;
 const LARGE_UPLOAD_THRESHOLDS: Record<FilePreviewType | "default", number> = {
-  image: 5 * ONE_MB,
+  image: 3 * ONE_MB,
   video: 200 * ONE_MB,
   audio: 120 * ONE_MB,
   pdf: 60 * ONE_MB,
@@ -187,9 +187,13 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   }, []);
 
   const updateQueue = useCallback((id: string, patch: Partial<UploadItem>) => {
-    setUploadQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
-    );
+    setUploadQueue((prev) => {
+      const next = prev.map((item) =>
+        item.id === id ? { ...item, ...patch } : item
+      );
+      queueRef.current = next;
+      return next;
+    });
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -619,6 +623,8 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
             URL.revokeObjectURL(item.previewUrl);
           }
         });
+
+        queueRef.current = next;
 
         return next;
       });
