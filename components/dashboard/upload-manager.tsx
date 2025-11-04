@@ -126,10 +126,18 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
   const startUploadForItem = useCallback(
     async (itemId: string) => {
-      const queueItem = queueRef.current.find((item) => item.id === itemId);
       const pendingMeta = pendingUploadsRef.current.get(itemId);
 
-      if (!queueItem || !pendingMeta) {
+      if (!pendingMeta) {
+        return;
+      }
+
+      const queueItem = queueRef.current.find((item) => item.id === itemId);
+
+      if (!queueItem) {
+        setTimeout(() => {
+          void startUploadForItem(itemId);
+        }, 0);
         return;
       }
 
@@ -137,11 +145,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const resolvedPrefix = queueItem.targetPrefix ?? pendingMeta.prefix;
       const file = pendingMeta.file;
-      const prefix =
-        queueItem.targetPrefix !== undefined
-          ? queueItem.targetPrefix
-          : pendingMeta.prefix;
 
       updateQueue(itemId, {
         status: "uploading",
@@ -159,7 +164,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({
             fileName: file.name,
             contentType: file.type,
-            prefix: prefix || undefined,
+            prefix: resolvedPrefix || undefined,
             size: file.size,
           }),
         });
