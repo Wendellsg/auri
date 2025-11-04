@@ -9,23 +9,20 @@ import {
   FileQuestion,
   FileText,
   Folder,
+  FolderPlus,
   HardDrive,
   LayoutGrid,
+  Loader2,
   RefreshCw,
   Search,
   Trash2,
   UploadCloud,
   Video,
-  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PermissionGate } from "@/components/auth/PermissionGate";
-import {
-  UploadProgressList,
-  type UploadItem,
-} from "@/components/dashboard/upload-progress";
-import { useSession, type SessionUser } from "@/hooks/use-session";
+import { useUploadManager } from "@/components/dashboard/upload-manager";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -34,6 +31,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -43,11 +49,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  type FileRecord,
-  type FilesResponse,
-  type PresignedUploadResponse,
-} from "@/lib/types";
+import { useSession, type SessionUser } from "@/hooks/use-session";
+import { type FileRecord, type FilesResponse } from "@/lib/types";
 import {
   cn,
   formatBytes,
@@ -89,37 +92,40 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const [query, setQuery] = useState("");
   const [activePrefix, setActivePrefix] = useState("");
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
-  const [transfersOpen, setTransfersOpen] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [creatingFolder, setCreatingFolder] = useState(false);
 
   const userPermissions = session?.permissions ?? [];
   const canUpload = userPermissions.includes("upload");
   const canDelete = userPermissions.includes("delete");
 
+  const { enqueueUploads, openPanel, isUploading } = useUploadManager();
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const queueRef = useRef<UploadItem[]>([]);
 
   const normalizedActivePrefix = useMemo(
     () => normalizePrefix(activePrefix),
     [activePrefix]
   );
 
-  const createUploadId = useCallback(() => {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-      return crypto.randomUUID();
-    }
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }, []);
-
-  const updateQueue = useCallback((id: string, patch: Partial<UploadItem>) => {
-    setUploadQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
-    );
-  }, []);
+  const trimmedFolderName = newFolderName.trim();
+  const normalizedFolderName =
+    trimmedFolderName.length > 0
+      ? trimmedFolderName.replace(/\s{2,}/g, " ")
+      : "";
+  const currentFolderPathLabel = normalizedActivePrefix
+    ? `/${normalizedActivePrefix}`
+    : "/";
+  const previewFolderPath =
+    normalizedFolderName.length > 0
+      ? `/${[normalizedActivePrefix, normalizedFolderName]
+          .filter(Boolean)
+          .join("/")}`
+      : null;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -148,20 +154,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   }, [fetchData]);
 
   useEffect(() => {
-    queueRef.current = uploadQueue;
-  }, [uploadQueue]);
-
-  useEffect(() => {
-    return () => {
-      queueRef.current.forEach((item) => {
-        if (item.previewUrl) {
-          URL.revokeObjectURL(item.previewUrl);
-        }
-      });
-    };
-  }, []);
-
-  useEffect(() => {
     if (!normalizedActivePrefix) return;
     const exists = data.files.some(
       (file) =>
@@ -175,23 +167,57 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
   const currentFolders = useMemo(() => {
     const map = new Map<string, number>();
-    const prefix = normalizedActivePrefix ? `${normalizedActivePrefix}/` : "";
+    const prefixSegments = normalizedActivePrefix
+      ? normalizedActivePrefix.split("/").filter(Boolean)
+      : [];
 
     data.files.forEach((file) => {
-      const key = file.key;
-      if (normalizedActivePrefix) {
-        if (!key.startsWith(prefix)) return;
-        const remainder = key.slice(prefix.length);
-        const parts = remainder.split("/").filter(Boolean);
-        if (parts.length > 1) {
-          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
+      const normalizedKey = normalizePrefix(file.key);
+      if (!normalizedKey) return;
+
+      const segments = normalizedKey.split("/").filter(Boolean);
+      if (!segments.length) return;
+
+      if (prefixSegments.length) {
+        if (segments.length <= prefixSegments.length) {
+          return;
         }
-      } else {
-        const parts = key.split("/").filter(Boolean);
-        if (parts.length > 1) {
-          map.set(parts[0], (map.get(parts[0]) ?? 0) + 1);
+
+        const matches = prefixSegments.every(
+          (segment, index) => segments[index] === segment
+        );
+        if (!matches) return;
+
+        const relativeSegments = segments.slice(prefixSegments.length);
+        const folderName = relativeSegments[0];
+        if (!folderName) return;
+
+        if (relativeSegments.length === 1) {
+          if (file.isFolderPlaceholder) {
+            if (!map.has(folderName)) {
+              map.set(folderName, 0);
+            }
+          }
+          return;
         }
+
+        map.set(folderName, (map.get(folderName) ?? 0) + 1);
+        return;
       }
+
+      const folderName = segments[0];
+      if (!folderName) return;
+
+      if (segments.length === 1) {
+        if (file.isFolderPlaceholder) {
+          if (!map.has(folderName)) {
+            map.set(folderName, 0);
+          }
+        }
+        return;
+      }
+
+      map.set(folderName, (map.get(folderName) ?? 0) + 1);
     });
 
     return Array.from(map.entries())
@@ -202,6 +228,9 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const currentFiles = useMemo(() => {
     const prefix = normalizedActivePrefix ? `${normalizedActivePrefix}/` : "";
     return data.files.filter((file) => {
+      if (file.isFolderPlaceholder) {
+        return false;
+      }
       if (normalizedActivePrefix) {
         if (!file.key.startsWith(prefix)) return false;
         const remainder = file.key.slice(prefix.length);
@@ -248,153 +277,139 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     [data.stats.bucket]
   );
 
+  const handleCreateFolder = useCallback(async () => {
+    if (!canUpload) {
+      setError("Você não possui permissão para criar pastas.");
+      return;
+    }
+    if (requiresSetup) {
+      setError(
+        "Configure a integração com o storage antes de criar novas pastas."
+      );
+      return;
+    }
+
+    if (!trimmedFolderName) {
+      setError("Informe um nome para a nova pasta.");
+      return;
+    }
+
+    if (/[\\/]/.test(trimmedFolderName)) {
+      setError("O nome da pasta não pode conter barras.");
+      return;
+    }
+
+    const duplicateFolder = currentFolders.some(
+      (folder) =>
+        folder.name.toLowerCase() === normalizedFolderName.toLowerCase()
+    );
+    if (duplicateFolder) {
+      setError("Já existe uma pasta com este nome neste nível.");
+      return;
+    }
+
+    const folderKey = [normalizedActivePrefix, normalizedFolderName]
+      .filter(Boolean)
+      .join("/");
+
+    const conflictingFile = data.files.some((file) => {
+      if (file.isFolderPlaceholder) return false;
+      return normalizePrefix(file.key) === normalizePrefix(folderKey);
+    });
+    if (conflictingFile) {
+      setError(
+        "Já existe um arquivo com este nome neste nível. Escolha outro nome."
+      );
+      return;
+    }
+
+    setCreatingFolder(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/files/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderName: normalizedFolderName,
+          prefix: normalizedActivePrefix || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        let message = "Não foi possível criar a pasta.";
+        try {
+          const json = (await response.json()) as { message?: string };
+          if (json?.message) {
+            message = json.message;
+          }
+        } catch {
+          try {
+            const text = await response.text();
+            if (text) {
+              message = text;
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+
+        setError(message);
+        return;
+      }
+
+      const nextPrefix = normalizePrefix(
+        [normalizedActivePrefix, normalizedFolderName].filter(Boolean).join("/")
+      );
+
+      setNewFolderName("");
+      setCreateFolderOpen(false);
+      setActivePrefix(nextPrefix);
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ocorreu um erro inesperado ao criar a pasta."
+      );
+    } finally {
+      setCreatingFolder(false);
+    }
+  }, [
+    canUpload,
+    currentFolders,
+    data.files,
+    fetchData,
+    trimmedFolderName,
+    normalizedActivePrefix,
+    normalizedFolderName,
+    requiresSetup,
+  ]);
+
   const handleFilesUpload = useCallback(
-    async (incoming: File[]) => {
+    (incoming: File[]) => {
       if (!incoming.length) return;
       if (!canUpload) {
         setError("Você não possui permissão para enviar arquivos.");
         return;
       }
-      setUploading(true);
+
       setError(null);
 
-      const prefixValue = normalizedActivePrefix;
-
-      const queueItems = incoming.map<UploadItem>((file) => {
-        const previewUrl = file.type.startsWith("image/")
-          ? URL.createObjectURL(file)
-          : undefined;
-        return {
-          id: createUploadId(),
-          fileName: file.name,
-          progress: 0,
-          status: "pending",
-          previewUrl,
-          mimeType: file.type || undefined,
-        };
+      enqueueUploads(incoming, {
+        prefix: normalizedActivePrefix || undefined,
+        onSuccess: async () => {
+          await fetchData();
+        },
+        onError: (message) => {
+          setError(message);
+        },
       });
 
-      setUploadQueue((prev) => {
-        const next = [
-          ...queueItems,
-          ...prev.filter((item) => item.status !== "success"),
-        ];
-
-        prev.forEach((item) => {
-          if (
-            item.previewUrl &&
-            !next.some((nextItem) => nextItem.id === item.id)
-          ) {
-            URL.revokeObjectURL(item.previewUrl);
-          }
-        });
-
-        return next;
-      });
-      setTransfersOpen(true);
-
-      const uploadSingleFile = async (file: File, itemId: string) => {
-        let presignData: PresignedUploadResponse | null = null;
-
-        try {
-          const response = await fetch("/api/files", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileName: file.name,
-              contentType: file.type,
-              prefix: prefixValue || undefined,
-              size: file.size,
-            }),
-          });
-
-          if (!response.ok) {
-            const message = await response.text();
-            throw new Error(
-              message || "Falha ao preparar upload. Verifique as configurações."
-            );
-          }
-
-          presignData = (await response.json()) as PresignedUploadResponse;
-        } catch (err) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : "Não foi possível gerar a URL de upload.";
-          updateQueue(itemId, { status: "error", error: message });
-          throw err instanceof Error ? err : new Error(message);
-        }
-
-        if (!presignData) {
-          const message =
-            "Não foi possível preparar os dados de upload. Tente novamente.";
-          updateQueue(itemId, { status: "error", error: message });
-          throw new Error(message);
-        }
-
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", presignData.uploadUrl);
-          xhr.withCredentials = false;
-
-          Object.entries(presignData.headers ?? {}).forEach(
-            ([header, value]) => {
-              if (value) {
-                xhr.setRequestHeader(header, value);
-              }
-            }
-          );
-
-          updateQueue(itemId, { status: "uploading", progress: 0 });
-
-          xhr.upload.onprogress = (event) => {
-            if (!event.lengthComputable) return;
-            const percent = (event.loaded / event.total) * 100;
-            updateQueue(itemId, { progress: percent });
-          };
-
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 400) {
-              updateQueue(itemId, { status: "success", progress: 100 });
-              resolve();
-            } else {
-              const message =
-                xhr.responseText ||
-                "Falha no upload para o bucket. Verifique as permissões de CORS.";
-              updateQueue(itemId, { status: "error", error: message });
-              reject(new Error(message));
-            }
-          };
-
-          xhr.onerror = () => {
-            const message = "Erro de conexão durante o upload para o bucket.";
-            updateQueue(itemId, { status: "error", error: message });
-            reject(new Error(message));
-          };
-
-          xhr.send(file);
-        });
-      };
-
-      for (let index = 0; index < incoming.length; index += 1) {
-        const file = incoming[index];
-        const queueItem = queueItems[index];
-        try {
-          await uploadSingleFile(file, queueItem.id);
-        } catch (err) {
-          console.error(err);
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Ocorreu um erro inesperado ao enviar o arquivo."
-          );
-        }
-      }
-
-      await fetchData();
-      setUploading(false);
+      openPanel();
     },
-    [canUpload, createUploadId, fetchData, normalizedActivePrefix, updateQueue]
+    [canUpload, enqueueUploads, normalizedActivePrefix, fetchData, openPanel]
   );
 
   const handleDelete = async (key: string) => {
@@ -454,7 +469,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     setIsDragging(false);
     const incoming = Array.from(event.dataTransfer?.files ?? []);
     if (incoming.length) {
-      void handleFilesUpload(incoming);
+      handleFilesUpload(incoming);
     }
   };
 
@@ -469,12 +484,9 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (files.length) {
-      void handleFilesUpload(files);
+      handleFilesUpload(files);
     }
   };
-
-  const openTransfers = () => setTransfersOpen(true);
-  const closeTransfers = () => setTransfersOpen(false);
 
   return (
     <div className="relative space-y-6">
@@ -546,7 +558,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                 type="button"
                 variant="outline"
                 className="rounded-full"
-                onClick={openTransfers}
+                onClick={openPanel}
               >
                 <LayoutGrid className="mr-2 h-4 w-4" />
                 Transferências
@@ -561,6 +573,119 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Atualizar
               </Button>
+              <PermissionGate
+                session={session}
+                permissions="upload"
+                fallback={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled
+                    title="Você não possui permissão para criar pastas."
+                  >
+                    <FolderPlus className="mr-2 h-4 w-4" />
+                    Nova pasta
+                  </Button>
+                }
+              >
+                <Dialog
+                  open={createFolderOpen}
+                  onOpenChange={(open) => {
+                    setCreateFolderOpen(open);
+                    if (!open) {
+                      setNewFolderName("");
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={requiresSetup}
+                    >
+                      <FolderPlus className="mr-2 h-4 w-4" />
+                      Nova pasta
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void handleCreateFolder();
+                      }}
+                      className="space-y-4"
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Nova pasta</DialogTitle>
+                        <DialogDescription>
+                          {normalizedActivePrefix
+                            ? `A pasta será criada dentro de /${normalizedActivePrefix}.`
+                            : "A pasta será criada na raiz do bucket."}
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+                        <p className="font-medium text-zinc-700 dark:text-zinc-200">
+                          Local de criação
+                        </p>
+                        <p className="mt-1 font-mono text-sm text-zinc-900 dark:text-zinc-100">
+                          {currentFolderPathLabel}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Input
+                          value={newFolderName}
+                          onChange={(event) =>
+                            setNewFolderName(event.target.value)
+                          }
+                          placeholder="Nome da pasta"
+                          className="rounded-full border-zinc-300 text-sm dark:border-zinc-700"
+                          disabled={creatingFolder}
+                          autoFocus
+                        />
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Evite caracteres especiais e mantenha o nome curto.
+                        </p>
+                        {previewFolderPath ? (
+                          <p className="font-mono text-xs text-zinc-600 dark:text-zinc-300">
+                            Caminho final: {previewFolderPath}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="rounded-full"
+                          onClick={() => {
+                            setCreateFolderOpen(false);
+                            setNewFolderName("");
+                          }}
+                          disabled={creatingFolder}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="submit"
+                          className="rounded-full"
+                          disabled={creatingFolder}
+                        >
+                          {creatingFolder ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <FolderPlus className="mr-2 h-4 w-4" />
+                          )}
+                          Criar pasta
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </PermissionGate>
               <PermissionGate
                 session={session}
                 permissions="upload"
@@ -583,7 +708,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                     if (requiresSetup) return;
                     fileInputRef.current?.click();
                   }}
-                  disabled={requiresSetup || uploading}
+                  disabled={requiresSetup || isUploading}
                 >
                   <UploadCloud className="mr-2 h-4 w-4" />
                   Novo upload
@@ -800,7 +925,10 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                                   <Download className="h-4 w-4" />
                                 </a>
                               </Button>
-                              <PermissionGate session={session} permissions="delete">
+                              <PermissionGate
+                                session={session}
+                                permissions="delete"
+                              >
                                 <Button
                                   type="button"
                                   size="icon"
@@ -828,40 +956,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       {error ? (
         <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
           {error}
-        </div>
-      ) : null}
-
-      {transfersOpen ? (
-        <div className="fixed bottom-6 right-6 z-50 w-full max-w-md animate-in fade-in slide-in-from-bottom-4">
-          <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="mb-3 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                  Transferências em andamento
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Acompanhe os últimos uploads enviados pelo painel.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={closeTransfers}
-                className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="max-h-72 overflow-y-auto pr-1">
-              <UploadProgressList items={uploadQueue} />
-              {uploadQueue.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-200 p-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-                  Nenhum upload em andamento no momento.
-                </div>
-              ) : null}
-            </div>
-          </div>
         </div>
       ) : null}
     </div>

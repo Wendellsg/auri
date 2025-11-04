@@ -6,6 +6,7 @@ export type AuthSession = {
   name: string;
   role: "admin" | "editor" | "viewer";
   permissions: string[];
+  termsAcceptedAt: string | null;
 };
 
 export const SESSION_COOKIE = "auri_session";

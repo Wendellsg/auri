@@ -7,6 +7,7 @@ export type SessionUser = {
   email: string;
   role: "admin" | "editor" | "viewer";
   permissions: string[];
+  termsAcceptedAt: string | null;
 };
 
 export function useSession() {
@@ -27,6 +28,10 @@ export function useSession() {
           permissions: Array.isArray(sessionUser.permissions)
             ? sessionUser.permissions
             : [],
+          termsAcceptedAt:
+            typeof sessionUser.termsAcceptedAt === "string"
+              ? sessionUser.termsAcceptedAt
+              : null,
         };
       })
       .then((sessionUser) => {

@@ -8,14 +8,19 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextResponse } from "next/server";
 
 import { ensureEditor, getSessionFromCookies } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 import { buildS3Url, createS3Client, toCdnUrl } from "@/lib/aws";
 import { getStorageSettings } from "@/lib/settings";
+import { formatBytes } from "@/lib/utils";
 
 function mapS3Object(
   object: S3Object,
   config: Awaited<ReturnType<typeof getStorageSettings>>
 ) {
   const key = object.Key ?? "arquivo";
+  const segments = key.split("/").filter(Boolean);
+  const fileName = segments.length ? segments[segments.length - 1] : key;
+  const isFolderPlaceholder = key.endsWith("/");
   const url =
     config && key
       ? buildS3Url(config, key)
@@ -23,13 +28,14 @@ function mapS3Object(
 
   return {
     key,
-    fileName: key.split("/").pop() ?? key,
+    fileName,
     size: object.Size ?? 0,
     lastModified:
       object.LastModified?.toISOString() ?? new Date().toISOString(),
     uploadedBy: object.Owner?.DisplayName ?? "Sistema",
     url,
     cdnUrl: toCdnUrl(url, config?.cdnHost),
+    isFolderPlaceholder,
   };
 }
 
@@ -71,17 +77,23 @@ export async function GET() {
           new Date(b.lastModified).getTime() -
           new Date(a.lastModified).getTime()
       );
+    const nonPlaceholderFiles = files.filter(
+      (file) => !file.isFolderPlaceholder
+    );
 
     return NextResponse.json({
       files,
       stats: {
-        totalFiles: files.length,
-        totalSize: files.reduce((acc, curr) => acc + curr.size, 0),
+        totalFiles: nonPlaceholderFiles.length,
+        totalSize: nonPlaceholderFiles.reduce(
+          (acc, curr) => acc + curr.size,
+          0
+        ),
         lastUpdated: new Date().toISOString(),
         bucket: settings.bucketName,
         cdnHost: settings.cdnHost || "não configurado",
       },
-      recentUploads: files.slice(0, 5).map((file) => ({
+      recentUploads: nonPlaceholderFiles.slice(0, 5).map((file) => ({
         id: file.key,
         fileName: file.fileName,
         uploadedAt: file.lastModified,
@@ -191,6 +203,23 @@ export async function POST(request: Request) {
     const url = buildS3Url(settings, key);
     const cdnUrl = toCdnUrl(url, settings.cdnHost);
 
+    const detailsParts = [`Arquivo: ${fileName}`];
+    if (typeof payload.size === "number") {
+      detailsParts.push(`Tamanho: ${formatBytes(payload.size)}`);
+    }
+    if (prefix) {
+      detailsParts.push(`Destino: /${prefix}`);
+    }
+
+    void logActivity({
+      userId: session.id,
+      userName: session.name,
+      userEmail: session.email,
+      action: "file_upload_prepared",
+      targetKey: key,
+      details: detailsParts.join(" | "),
+    });
+
     return NextResponse.json(
       {
         message: "URL de upload gerada com sucesso.",
@@ -262,6 +291,15 @@ export async function DELETE(request: Request) {
         Key: key,
       })
     );
+
+    void logActivity({
+      userId: session.id,
+      userName: session.name,
+      userEmail: session.email,
+      action: "file_deleted",
+      targetKey: key,
+      details: `Arquivo removido: ${key}`,
+    });
 
     return NextResponse.json({ message: "Arquivo removido com sucesso." });
   } catch (error) {

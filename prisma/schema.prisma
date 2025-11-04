@@ -29,6 +29,7 @@ model User {
   passwordHash String
   createdAt    DateTime   @default(now())
   lastAccessAt DateTime?
+  termsAcceptedAt DateTime?
 }
 
 model AppSettings {
@@ -47,4 +48,18 @@ model OnboardingState {
   id          String    @id @map("_id")
   completedAt DateTime?
   createdAt   DateTime  @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  userName   String
+  userEmail  String
+  action     String
+  targetKey  String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
 }
