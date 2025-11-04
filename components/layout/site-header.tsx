@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  History,
   LayoutDashboard,
   Menu,
   Settings2,
@@ -29,6 +30,7 @@ export function SiteHeader() {
     ];
     if (session?.role === "admin") {
       base.push(
+        { href: "/activity", label: "Atividades", icon: History },
         { href: "/users", label: "Usuários", icon: ShieldCheck },
         { href: "/settings", label: "Configurações", icon: Settings2 }
       );
@@ -42,6 +44,7 @@ export function SiteHeader() {
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 sm:px-8 lg:px-12">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 font-semibold">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               width={40}
               height={40}

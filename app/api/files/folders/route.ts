@@ -5,6 +5,7 @@ import {
 import { NextResponse } from "next/server";
 
 import { ensureEditor, getSessionFromCookies } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 import { createS3Client } from "@/lib/aws";
 import { getStorageSettings } from "@/lib/settings";
 
@@ -120,6 +121,15 @@ export async function POST(request: Request) {
         },
       })
     );
+
+    void logActivity({
+      userId: session.id,
+      userName: session.name,
+      userEmail: session.email,
+      action: "folder_created",
+      targetKey: folderKey,
+      details: `Pasta criada: /${folderPath || folderName}`,
+    });
 
     return NextResponse.json(
       { message: "Pasta criada com sucesso.", key: folderKey },

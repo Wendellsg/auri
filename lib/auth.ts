@@ -41,6 +41,9 @@ export async function authenticateUser(email: string, password: string) {
     name: user.name,
     role: user.role,
     permissions: user.permissions ?? [],
+    termsAcceptedAt: user.termsAcceptedAt
+      ? user.termsAcceptedAt.toISOString()
+      : null,
   } satisfies AuthSession;
 }
 
@@ -76,6 +79,10 @@ export async function getSessionFromCookies() {
       permissions: Array.isArray(session.permissions)
         ? session.permissions
         : [],
+      termsAcceptedAt:
+        typeof session.termsAcceptedAt === "string"
+          ? session.termsAcceptedAt
+          : null,
     };
   } catch {
     return null;
@@ -94,6 +101,10 @@ export async function requireSession(request: NextRequest) {
       permissions: Array.isArray(session.permissions)
         ? session.permissions
         : [],
+      termsAcceptedAt:
+        typeof session.termsAcceptedAt === "string"
+          ? session.termsAcceptedAt
+          : null,
     };
   } catch {
     return null;

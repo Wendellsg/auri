@@ -8,8 +8,10 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextResponse } from "next/server";
 
 import { ensureEditor, getSessionFromCookies } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 import { buildS3Url, createS3Client, toCdnUrl } from "@/lib/aws";
 import { getStorageSettings } from "@/lib/settings";
+import { formatBytes } from "@/lib/utils";
 
 function mapS3Object(
   object: S3Object,
@@ -201,6 +203,23 @@ export async function POST(request: Request) {
     const url = buildS3Url(settings, key);
     const cdnUrl = toCdnUrl(url, settings.cdnHost);
 
+    const detailsParts = [`Arquivo: ${fileName}`];
+    if (typeof payload.size === "number") {
+      detailsParts.push(`Tamanho: ${formatBytes(payload.size)}`);
+    }
+    if (prefix) {
+      detailsParts.push(`Destino: /${prefix}`);
+    }
+
+    void logActivity({
+      userId: session.id,
+      userName: session.name,
+      userEmail: session.email,
+      action: "file_upload_prepared",
+      targetKey: key,
+      details: detailsParts.join(" | "),
+    });
+
     return NextResponse.json(
       {
         message: "URL de upload gerada com sucesso.",
@@ -272,6 +291,15 @@ export async function DELETE(request: Request) {
         Key: key,
       })
     );
+
+    void logActivity({
+      userId: session.id,
+      userName: session.name,
+      userEmail: session.email,
+      action: "file_deleted",
+      targetKey: key,
+      details: `Arquivo removido: ${key}`,
+    });
 
     return NextResponse.json({ message: "Arquivo removido com sucesso." });
   } catch (error) {
