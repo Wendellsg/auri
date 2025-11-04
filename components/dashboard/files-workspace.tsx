@@ -27,7 +27,6 @@ import {
   UploadProgressList,
   type UploadItem,
 } from "@/components/dashboard/upload-progress";
-import { useSession, type SessionUser } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -54,6 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useSession, type SessionUser } from "@/hooks/use-session";
 import {
   type FileRecord,
   type FilesResponse,
@@ -83,11 +83,11 @@ const normalizePrefix = (prefix: string) => prefix.replace(/^\/+|\/+$/g, "");
 
 const ONE_MB = 1024 * 1024;
 const LARGE_UPLOAD_THRESHOLDS: Record<FilePreviewType | "default", number> = {
-  image: 40 * ONE_MB,
+  image: 5 * ONE_MB,
   video: 200 * ONE_MB,
   audio: 120 * ONE_MB,
   pdf: 60 * ONE_MB,
-  text: 30 * ONE_MB,
+  text: 10 * ONE_MB,
   other: 80 * ONE_MB,
   default: 80 * ONE_MB,
 };
@@ -393,8 +393,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
         if (!response.ok) {
           const message = await response.text();
           throw new Error(
-            message ||
-              "Falha ao preparar upload. Verifique as configurações."
+            message || "Falha ao preparar upload. Verifique as configurações."
           );
         }
 
@@ -636,12 +635,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
           void startUploadForItem(item.id);
         });
     },
-    [
-      canUpload,
-      createUploadId,
-      normalizedActivePrefix,
-      startUploadForItem,
-    ]
+    [canUpload, createUploadId, normalizedActivePrefix, startUploadForItem]
   );
 
   const handleConfirmUpload = useCallback(
@@ -1167,7 +1161,10 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                                   <Download className="h-4 w-4" />
                                 </a>
                               </Button>
-                              <PermissionGate session={session} permissions="delete">
+                              <PermissionGate
+                                session={session}
+                                permissions="delete"
+                              >
                                 <Button
                                   type="button"
                                   size="icon"
