@@ -17,12 +17,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
-import { type FilePreviewType, formatBytes, getFilePreviewType } from "@/lib/utils";
 import type { PresignedUploadResponse } from "@/lib/types";
+import {
+  formatBytes,
+  getFilePreviewType,
+  type FilePreviewType,
+} from "@/lib/utils";
 
 const ONE_MB = 1024 * 1024;
 const LARGE_UPLOAD_THRESHOLDS: Record<FilePreviewType | "default", number> = {
-  image: 40 * ONE_MB,
+  image: 3 * ONE_MB,
   video: 200 * ONE_MB,
   audio: 120 * ONE_MB,
   pdf: 60 * ONE_MB,
@@ -129,10 +133,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (
-        queueItem.status === "uploading" ||
-        queueItem.status === "success"
-      ) {
+      if (queueItem.status === "uploading" || queueItem.status === "success") {
         return;
       }
 
@@ -166,8 +167,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         if (!response.ok) {
           const message = await response.text();
           throw new Error(
-            message ||
-              "Falha ao preparar upload. Verifique as configurações."
+            message || "Falha ao preparar upload. Verifique as configurações."
           );
         }
 
@@ -331,7 +331,15 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       confirmUpload,
       isUploading,
     }),
-    [queue, panelOpen, openPanel, closePanel, enqueueUploads, confirmUpload, isUploading]
+    [
+      queue,
+      panelOpen,
+      openPanel,
+      closePanel,
+      enqueueUploads,
+      confirmUpload,
+      isUploading,
+    ]
   );
 
   return (
@@ -342,7 +350,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 export function useUploadManager() {
   const context = useContext(UploadContext);
   if (!context) {
-    throw new Error("useUploadManager deve ser utilizado dentro de UploadProvider");
+    throw new Error(
+      "useUploadManager deve ser utilizado dentro de UploadProvider"
+    );
   }
   return context;
 }
@@ -377,10 +387,7 @@ export function UploadTransfersPanel() {
           </Button>
         </div>
         <div className="max-h-72 overflow-y-auto pr-1">
-          <UploadProgressList
-            items={queue}
-            onConfirmUpload={confirmUpload}
-          />
+          <UploadProgressList items={queue} onConfirmUpload={confirmUpload} />
           {queue.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-200 p-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
               Nenhum upload em andamento no momento.

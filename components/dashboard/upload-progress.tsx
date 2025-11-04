@@ -1,16 +1,16 @@
 "use client";
 
-import Image from "next/image";
 import {
   Check,
-  Loader2,
-  XCircle,
   File as FileIcon,
+  Loader2,
   ShieldAlert,
+  XCircle,
 } from "lucide-react";
+import Image from "next/image";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type UploadItem = {
   id: string;
@@ -46,7 +46,9 @@ export function UploadProgressList({
     <div className="space-y-3">
       {items.map((item) => {
         const progressValue =
-          item.status === "success" ? 100 : Math.min(100, Math.round(item.progress));
+          item.status === "success"
+            ? 100
+            : Math.min(100, Math.round(item.progress));
 
         return (
           <div
@@ -79,10 +81,10 @@ export function UploadProgressList({
                     {item.status === "success"
                       ? "Upload concluído"
                       : item.status === "error"
-                        ? "Erro ao enviar"
-                        : item.status === "awaiting_confirmation"
-                          ? "Aguardando confirmação"
-                          : "Enviando..."}
+                      ? "Erro ao enviar"
+                      : item.status === "awaiting_confirmation"
+                      ? "Aguardando confirmação"
+                      : "Enviando..."}
                   </span>
                 </div>
                 <div className="mt-1">
@@ -105,8 +107,8 @@ export function UploadProgressList({
                   item.status === "error"
                     ? "bg-red-500"
                     : item.status === "success"
-                      ? "bg-emerald-500"
-                      : "bg-zinc-900",
+                    ? "bg-emerald-500"
+                    : "bg-yellow-200"
                 )}
                 style={{ width: `${progressValue}%` }}
               />
@@ -116,7 +118,10 @@ export function UploadProgressList({
             ) : null}
             {item.status === "awaiting_confirmation" ? (
               <div className="mt-3 space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200">
-                <p>{item.confirmationMessage ?? "Confirme para iniciar o upload."}</p>
+                <p>
+                  {item.confirmationMessage ??
+                    "Confirme para iniciar o upload."}
+                </p>
                 {onConfirmUpload ? (
                   <Button
                     type="button"
