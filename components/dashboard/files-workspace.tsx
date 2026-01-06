@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   AudioLines,
+  ChevronLeft,
   ChevronRight,
   Copy,
   Download,
@@ -68,6 +69,12 @@ const INITIAL_STATE: FilesResponse = {
     cdnHost: "-",
   },
   recentUploads: [],
+  pagination: {
+    page: 1,
+    limit: 50,
+    totalPages: 0,
+    totalItems: 0,
+  },
 };
 
 const normalizePrefix = (prefix: string) => prefix.replace(/^\/+|\/+$/g, "");
@@ -98,6 +105,8 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   const userPermissions = session?.permissions ?? [];
   const canUpload = userPermissions.includes("upload");
@@ -131,7 +140,13 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/files", { cache: "no-store" });
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      const response = await fetch(`/api/files?${params}`, {
+        cache: "no-store",
+      });
       if (!response.ok) {
         throw new Error("Não foi possível recuperar os arquivos.");
       }
@@ -147,7 +162,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, itemsPerPage]);
 
   useEffect(() => {
     fetchData();
@@ -949,6 +964,110 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                 </TableBody>
               </Table>
             </div>
+
+            {!loading && explorerEntries.length > 0 && (
+              <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span>Exibindo</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      <option value="10">10</option>
+                      <option value="25">25</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </select>
+                    <span>
+                      itens por página de {data.pagination.totalItems} total
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={currentPage === 1 || loading}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Anterior
+                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from(
+                        { length: Math.min(5, data.pagination.totalPages) },
+                        (_, i) => {
+                          let pageNumber: number;
+
+                          if (data.pagination.totalPages <= 5) {
+                            pageNumber = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNumber = i + 1;
+                          } else if (
+                            currentPage >=
+                            data.pagination.totalPages - 2
+                          ) {
+                            pageNumber = data.pagination.totalPages - 4 + i;
+                          } else {
+                            pageNumber = currentPage - 2 + i;
+                          }
+
+                          return (
+                            <Button
+                              key={pageNumber}
+                              type="button"
+                              variant={
+                                currentPage === pageNumber
+                                  ? "default"
+                                  : "outline"
+                              }
+                              size="sm"
+                              className="h-8 w-8 rounded-lg p-0"
+                              onClick={() => setCurrentPage(pageNumber)}
+                              disabled={loading}
+                            >
+                              {pageNumber}
+                            </Button>
+                          );
+                        }
+                      )}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() =>
+                        setCurrentPage((prev) =>
+                          Math.min(data.pagination.totalPages, prev + 1)
+                        )
+                      }
+                      disabled={
+                        currentPage === data.pagination.totalPages || loading
+                      }
+                    >
+                      Próxima
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+                  Página {data.pagination.page} de {data.pagination.totalPages}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
