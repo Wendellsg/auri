@@ -37,6 +37,12 @@ const INITIAL_STATE: FilesResponse = {
     cdnHost: "-",
   },
   recentUploads: [],
+  pagination: {
+    page: 0,
+    limit: 0,
+    totalPages: 0,
+    totalItems: 0,
+  },
 };
 
 export function OverviewDashboard() {
@@ -226,54 +232,54 @@ export function OverviewDashboard() {
             </CardContent>
           </Card>
 
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle,_rgba(24,24,27,0.08),_transparent_65%)]" />
-          <CardHeader>
-            <CardTitle>Checklist de segurança</CardTitle>
-            <CardDescription>
-              Boas práticas para manter o bucket protegido e auditável.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <Shield className="mt-0.5 h-4 w-4 text-emerald-500" />
-              <div>
-                <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                  Permissões validadas
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Utilize grupos dedicados por equipe ou projeto para evitar
-                  acessos desnecessários.
-                </p>
+          <Card className="relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle,_rgba(24,24,27,0.08),_transparent_65%)]" />
+            <CardHeader>
+              <CardTitle>Checklist de segurança</CardTitle>
+              <CardDescription>
+                Boas práticas para manter o bucket protegido e auditável.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <Shield className="mt-0.5 h-4 w-4 text-emerald-500" />
+                <div>
+                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                    Permissões validadas
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Utilize grupos dedicados por equipe ou projeto para evitar
+                    acessos desnecessários.
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <ArrowUpRight className="mt-0.5 h-4 w-4 text-sky-500" />
-              <div>
-                <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                  CDN pronta para entrega
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Garanta que o domínio CDN esteja com SSL válido e cabeçalhos
-                  de cache configurados.
-                </p>
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <ArrowUpRight className="mt-0.5 h-4 w-4 text-sky-500" />
+                <div>
+                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                    CDN pronta para entrega
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Garanta que o domínio CDN esteja com SSL válido e cabeçalhos
+                    de cache configurados.
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <AlertCircle className="mt-0.5 h-4 w-4 text-amber-500" />
-              <div>
-                <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                  Observabilidade ativa
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Configure alerts (CloudWatch / Grafana) para acompanhar picos
-                  de uso ou alterações inesperadas.
-                </p>
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <AlertCircle className="mt-0.5 h-4 w-4 text-amber-500" />
+                <div>
+                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                    Observabilidade ativa
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Configure alerts (CloudWatch / Grafana) para acompanhar
+                    picos de uso ou alterações inesperadas.
+                  </p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+            </CardContent>
+          </Card>
+        </section>
 
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
