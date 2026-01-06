@@ -39,7 +39,7 @@ function mapS3Object(
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSessionFromCookies();
   if (!session) {
     return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
@@ -59,17 +59,27 @@ export async function GET() {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(
+      1,
+      Number.parseInt(searchParams.get("page") || "1", 10)
+    );
+    const limit = Math.min(
+      200,
+      Math.max(10, Number.parseInt(searchParams.get("limit") || "50", 10))
+    );
+
     const client = createS3Client(settings);
 
     const response = await client.send(
       new ListObjectsV2Command({
         Bucket: settings.bucketName,
-        MaxKeys: 200,
+        MaxKeys: 1000,
       })
     );
 
     const objects = response.Contents ?? [];
-    const files = objects
+    const allFiles = objects
       .filter((object) => object.Key)
       .map((object) => mapS3Object(object, settings))
       .sort(
@@ -77,12 +87,19 @@ export async function GET() {
           new Date(b.lastModified).getTime() -
           new Date(a.lastModified).getTime()
       );
-    const nonPlaceholderFiles = files.filter(
+
+    const nonPlaceholderFiles = allFiles.filter(
       (file) => !file.isFolderPlaceholder
     );
 
+    const totalItems = allFiles.length;
+    const totalPages = Math.ceil(totalItems / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedFiles = allFiles.slice(startIndex, endIndex);
+
     return NextResponse.json({
-      files,
+      files: paginatedFiles,
       stats: {
         totalFiles: nonPlaceholderFiles.length,
         totalSize: nonPlaceholderFiles.reduce(
@@ -100,6 +117,12 @@ export async function GET() {
         uploadedBy: file.uploadedBy,
         size: file.size,
       })),
+      pagination: {
+        page,
+        limit,
+        totalPages,
+        totalItems,
+      },
     });
   } catch (error) {
     console.error(error);

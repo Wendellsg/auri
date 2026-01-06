@@ -27,6 +27,12 @@ export type FilesResponse = {
     uploadedBy?: string;
     size: number;
   }>;
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalItems: number;
+  };
 };
 
 export type PresignedUploadResponse = {
