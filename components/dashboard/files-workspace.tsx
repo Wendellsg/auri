@@ -83,7 +83,6 @@ type ExplorerEntry =
   | {
       type: "folder";
       name: string;
-      itemCount: number;
     }
   | {
       type: "file";
@@ -140,7 +139,15 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/files", { cache: "no-store" });
+      const params = new URLSearchParams();
+      if (normalizedActivePrefix) {
+        params.set("prefix", normalizedActivePrefix);
+      }
+      const suffix = params.toString();
+      const response = await fetch(
+        suffix ? `/api/files?${suffix}` : "/api/files",
+        { cache: "no-store" }
+      );
       if (!response.ok) {
         throw new Error("Não foi possível recuperar os arquivos.");
       }
@@ -156,26 +163,18 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [normalizedActivePrefix]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   useEffect(() => {
-    if (!normalizedActivePrefix) return;
-    const exists = data.files.some(
-      (file) =>
-        file.key === normalizedActivePrefix ||
-        file.key.startsWith(`${normalizedActivePrefix}/`)
-    );
-    if (!exists) {
-      setActivePrefix("");
-    }
-  }, [data.files, normalizedActivePrefix]);
+    setCurrentPage(1);
+  }, [normalizedActivePrefix]);
 
   const currentFolders = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, true>();
     const prefixSegments = normalizedActivePrefix
       ? normalizedActivePrefix.split("/").filter(Boolean)
       : [];
@@ -204,13 +203,13 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
         if (relativeSegments.length === 1) {
           if (file.isFolderPlaceholder) {
             if (!map.has(folderName)) {
-              map.set(folderName, 0);
+              map.set(folderName, true);
             }
           }
           return;
         }
 
-        map.set(folderName, (map.get(folderName) ?? 0) + 1);
+        map.set(folderName, true);
         return;
       }
 
@@ -220,17 +219,17 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       if (segments.length === 1) {
         if (file.isFolderPlaceholder) {
           if (!map.has(folderName)) {
-            map.set(folderName, 0);
+            map.set(folderName, true);
           }
         }
         return;
       }
 
-      map.set(folderName, (map.get(folderName) ?? 0) + 1);
+      map.set(folderName, true);
     });
 
-    return Array.from(map.entries())
-      .map(([name, count]) => ({ name, count }))
+    return Array.from(map.keys())
+      .map((name) => ({ name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [data.files, normalizedActivePrefix]);
 
@@ -260,7 +259,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       .map<ExplorerEntry>((folder) => ({
         type: "folder",
         name: folder.name,
-        itemCount: folder.count,
       }));
 
     const files = currentFiles
@@ -868,9 +866,6 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                                 <div>
                                   <p className="font-medium text-zinc-900 dark:text-zinc-50">
                                     {entry.name}
-                                  </p>
-                                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                    {entry.itemCount} item(s)
                                   </p>
                                 </div>
                               </div>
