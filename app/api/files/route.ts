@@ -59,16 +59,6 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const page = Math.max(
-      1,
-      Number.parseInt(searchParams.get("page") || "1", 10)
-    );
-    const limit = Math.min(
-      200,
-      Math.max(10, Number.parseInt(searchParams.get("limit") || "50", 10))
-    );
-
     const client = createS3Client(settings);
 
     const response = await client.send(
@@ -93,10 +83,8 @@ export async function GET(request: Request) {
     );
 
     const totalItems = allFiles.length;
-    const totalPages = Math.ceil(totalItems / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedFiles = allFiles.slice(startIndex, endIndex);
+    const totalPages = totalItems > 0 ? 1 : 0;
+    const paginatedFiles = allFiles;
 
     return NextResponse.json({
       files: paginatedFiles,
@@ -118,8 +106,8 @@ export async function GET(request: Request) {
         size: file.size,
       })),
       pagination: {
-        page,
-        limit,
+        page: totalPages > 0 ? 1 : 0,
+        limit: totalItems,
         totalPages,
         totalItems,
       },
