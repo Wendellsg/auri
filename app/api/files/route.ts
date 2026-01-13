@@ -39,6 +39,9 @@ function mapS3Object(
   };
 }
 
+const normalizePrefix = (value: string) =>
+  value.trim().replace(/^\/+|\/+$/g, "");
+
 export async function GET(request: Request) {
   const session = await getSessionFromCookies();
   if (!session) {
@@ -59,24 +62,48 @@ export async function GET(request: Request) {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const rawPrefix = normalizePrefix(searchParams.get("prefix") || "");
+    const prefix = rawPrefix ? `${rawPrefix}/` : undefined;
+
     const client = createS3Client(settings);
 
     const response = await client.send(
       new ListObjectsV2Command({
         Bucket: settings.bucketName,
+        Prefix: prefix,
+        Delimiter: "/",
         MaxKeys: 1000,
       })
     );
 
     const objects = response.Contents ?? [];
-    const allFiles = objects
+    const files = objects
       .filter((object) => object.Key)
+      .filter((object) => !object.Key?.endsWith("/"))
       .map((object) => mapS3Object(object, settings))
       .sort(
         (a, b) =>
           new Date(b.lastModified).getTime() -
           new Date(a.lastModified).getTime()
       );
+
+    const folderPlaceholders = (response.CommonPrefixes ?? [])
+      .map((item) => item.Prefix)
+      .filter((key): key is string => Boolean(key))
+      .map((key) => mapS3Object({ Key: key } as S3Object, settings));
+
+    const entries = new Map<string, ReturnType<typeof mapS3Object>>();
+    files.forEach((file) => {
+      entries.set(file.key, file);
+    });
+    folderPlaceholders.forEach((folder) => {
+      if (!entries.has(folder.key)) {
+        entries.set(folder.key, folder);
+      }
+    });
+
+    const allFiles = Array.from(entries.values());
 
     const nonPlaceholderFiles = allFiles.filter(
       (file) => !file.isFolderPlaceholder
