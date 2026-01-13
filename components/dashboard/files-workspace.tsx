@@ -140,13 +140,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-      });
-      const response = await fetch(`/api/files?${params}`, {
-        cache: "no-store",
-      });
+      const response = await fetch("/api/files", { cache: "no-store" });
       if (!response.ok) {
         throw new Error("Não foi possível recuperar os arquivos.");
       }
@@ -162,7 +156,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -281,6 +275,29 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
     return [...folders, ...files];
   }, [currentFiles, currentFolders, query]);
+
+  const { paginatedEntries, totalItems, totalPages, effectivePage } = useMemo(
+    () => {
+      const totalItems = explorerEntries.length;
+      const totalPages =
+        totalItems > 0 ? Math.ceil(totalItems / itemsPerPage) : 0;
+      const effectivePage =
+        totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+      const startIndex = (effectivePage - 1) * itemsPerPage;
+      const paginatedEntries = explorerEntries.slice(
+        startIndex,
+        startIndex + itemsPerPage
+      );
+      return { paginatedEntries, totalItems, totalPages, effectivePage };
+    },
+    [explorerEntries, itemsPerPage, currentPage]
+  );
+
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const breadcrumbs = useMemo(
     () => (normalizedActivePrefix ? normalizedActivePrefix.split("/") : []),
@@ -827,7 +844,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    explorerEntries.map((entry) => {
+                    paginatedEntries.map((entry) => {
                       if (entry.type === "folder") {
                         return (
                           <TableRow
@@ -984,7 +1001,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                       <option value="100">100</option>
                     </select>
                     <span>
-                      itens por página de {data.pagination.totalItems} total
+                      itens por página de {totalItems} total
                     </span>
                   </div>
 
@@ -997,7 +1014,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                       onClick={() =>
                         setCurrentPage((prev) => Math.max(1, prev - 1))
                       }
-                      disabled={currentPage === 1 || loading}
+                      disabled={effectivePage === 1 || loading}
                     >
                       <ChevronLeft className="h-4 w-4" />
                       Anterior
@@ -1005,21 +1022,18 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
                     <div className="flex items-center gap-1">
                       {Array.from(
-                        { length: Math.min(5, data.pagination.totalPages) },
+                        { length: Math.min(5, totalPages) },
                         (_, i) => {
                           let pageNumber: number;
 
-                          if (data.pagination.totalPages <= 5) {
+                          if (totalPages <= 5) {
                             pageNumber = i + 1;
-                          } else if (currentPage <= 3) {
+                          } else if (effectivePage <= 3) {
                             pageNumber = i + 1;
-                          } else if (
-                            currentPage >=
-                            data.pagination.totalPages - 2
-                          ) {
-                            pageNumber = data.pagination.totalPages - 4 + i;
+                          } else if (effectivePage >= totalPages - 2) {
+                            pageNumber = totalPages - 4 + i;
                           } else {
-                            pageNumber = currentPage - 2 + i;
+                            pageNumber = effectivePage - 2 + i;
                           }
 
                           return (
@@ -1027,7 +1041,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                               key={pageNumber}
                               type="button"
                               variant={
-                                currentPage === pageNumber
+                                effectivePage === pageNumber
                                   ? "default"
                                   : "outline"
                               }
@@ -1050,11 +1064,11 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                       className="rounded-lg"
                       onClick={() =>
                         setCurrentPage((prev) =>
-                          Math.min(data.pagination.totalPages, prev + 1)
+                          Math.min(Math.max(1, totalPages), prev + 1)
                         )
                       }
                       disabled={
-                        currentPage === data.pagination.totalPages || loading
+                        effectivePage === totalPages || loading
                       }
                     >
                       Próxima
@@ -1064,7 +1078,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                 </div>
 
                 <div className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-                  Página {data.pagination.page} de {data.pagination.totalPages}
+                  Página {effectivePage} de {totalPages}
                 </div>
               </div>
             )}
