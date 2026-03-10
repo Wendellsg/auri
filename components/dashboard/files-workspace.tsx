@@ -19,6 +19,7 @@ import {
   Trash2,
   UploadCloud,
   Video,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -106,6 +107,10 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [invalidatingKey, setInvalidatingKey] = useState<string | null>(null);
+  const [invalidateSuccessKey, setInvalidateSuccessKey] = useState<
+    string | null
+  >(null);
 
   const userPermissions = session?.permissions ?? [];
   const canUpload = userPermissions.includes("upload");
@@ -117,7 +122,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
   const normalizedActivePrefix = useMemo(
     () => normalizePrefix(activePrefix),
-    [activePrefix]
+    [activePrefix],
   );
 
   const trimmedFolderName = newFolderName.trim();
@@ -146,7 +151,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       const suffix = params.toString();
       const response = await fetch(
         suffix ? `/api/files?${suffix}` : "/api/files",
-        { cache: "no-store" }
+        { cache: "no-store" },
       );
       if (!response.ok) {
         throw new Error("Não foi possível recuperar os arquivos.");
@@ -158,7 +163,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um erro inesperado ao carregar os arquivos."
+          : "Ocorreu um erro inesperado ao carregar os arquivos.",
       );
     } finally {
       setLoading(false);
@@ -192,7 +197,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
         }
 
         const matches = prefixSegments.every(
-          (segment, index) => segments[index] === segment
+          (segment, index) => segments[index] === segment,
         );
         if (!matches) return;
 
@@ -254,7 +259,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
     const folders = currentFolders
       .filter((folder) =>
-        search ? folder.name.toLowerCase().includes(search) : true
+        search ? folder.name.toLowerCase().includes(search) : true,
       )
       .map<ExplorerEntry>((folder) => ({
         type: "folder",
@@ -274,8 +279,8 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     return [...folders, ...files];
   }, [currentFiles, currentFolders, query]);
 
-  const { paginatedEntries, totalItems, totalPages, effectivePage } = useMemo(
-    () => {
+  const { paginatedEntries, totalItems, totalPages, effectivePage } =
+    useMemo(() => {
       const totalItems = explorerEntries.length;
       const totalPages =
         totalItems > 0 ? Math.ceil(totalItems / itemsPerPage) : 0;
@@ -284,12 +289,10 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       const startIndex = (effectivePage - 1) * itemsPerPage;
       const paginatedEntries = explorerEntries.slice(
         startIndex,
-        startIndex + itemsPerPage
+        startIndex + itemsPerPage,
       );
       return { paginatedEntries, totalItems, totalPages, effectivePage };
-    },
-    [explorerEntries, itemsPerPage, currentPage]
-  );
+    }, [explorerEntries, itemsPerPage, currentPage]);
 
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
@@ -299,12 +302,12 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
   const breadcrumbs = useMemo(
     () => (normalizedActivePrefix ? normalizedActivePrefix.split("/") : []),
-    [normalizedActivePrefix]
+    [normalizedActivePrefix],
   );
 
   const requiresSetup = useMemo(
     () => data.stats.bucket.toLowerCase().includes("configure"),
-    [data.stats.bucket]
+    [data.stats.bucket],
   );
 
   const handleCreateFolder = useCallback(async () => {
@@ -314,7 +317,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     }
     if (requiresSetup) {
       setError(
-        "Configure a integração com o storage antes de criar novas pastas."
+        "Configure a integração com o storage antes de criar novas pastas.",
       );
       return;
     }
@@ -331,7 +334,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
     const duplicateFolder = currentFolders.some(
       (folder) =>
-        folder.name.toLowerCase() === normalizedFolderName.toLowerCase()
+        folder.name.toLowerCase() === normalizedFolderName.toLowerCase(),
     );
     if (duplicateFolder) {
       setError("Já existe uma pasta com este nome neste nível.");
@@ -348,7 +351,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
     });
     if (conflictingFile) {
       setError(
-        "Já existe um arquivo com este nome neste nível. Escolha outro nome."
+        "Já existe um arquivo com este nome neste nível. Escolha outro nome.",
       );
       return;
     }
@@ -389,7 +392,9 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       }
 
       const nextPrefix = normalizePrefix(
-        [normalizedActivePrefix, normalizedFolderName].filter(Boolean).join("/")
+        [normalizedActivePrefix, normalizedFolderName]
+          .filter(Boolean)
+          .join("/"),
       );
 
       setNewFolderName("");
@@ -401,7 +406,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um erro inesperado ao criar a pasta."
+          : "Ocorreu um erro inesperado ao criar a pasta.",
       );
     } finally {
       setCreatingFolder(false);
@@ -439,7 +444,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
 
       openPanel();
     },
-    [canUpload, enqueueUploads, normalizedActivePrefix, fetchData, openPanel]
+    [canUpload, enqueueUploads, normalizedActivePrefix, fetchData, openPanel],
   );
 
   const handleDelete = async (key: string) => {
@@ -448,7 +453,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       return;
     }
     const confirmation = window.confirm(
-      "Tem certeza que deseja remover este arquivo do bucket?"
+      "Tem certeza que deseja remover este arquivo do bucket?",
     );
     if (!confirmation) return;
 
@@ -460,7 +465,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
         `/api/files?key=${encodeURIComponent(key)}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (!response.ok) {
@@ -474,10 +479,65 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um erro inesperado ao remover o arquivo."
+          : "Ocorreu um erro inesperado ao remover o arquivo.",
       );
     } finally {
       setDeletingKey(null);
+    }
+  };
+
+  const handleInvalidate = async (fileKey: string) => {
+    if (!canUpload && !userPermissions.includes("admin")) {
+      setError("Você não possui permissão para invalidar o cache.");
+      return;
+    }
+
+    setInvalidatingKey(fileKey);
+    setError(null);
+    setInvalidateSuccessKey(null);
+
+    try {
+      const response = await fetch("/api/cloudfront/invalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: fileKey }),
+      });
+
+      if (!response.ok) {
+        let message = "Não foi possível invalidar o cache.";
+        try {
+          const json = (await response.json()) as { message?: string };
+          if (json?.message) {
+            message = json.message;
+          }
+        } catch {
+          try {
+            const text = await response.text();
+            if (text) {
+              message = text;
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+        throw new Error(message);
+      }
+
+      setInvalidateSuccessKey(fileKey);
+
+      // Clear success state after 3 seconds
+      setTimeout(() => {
+        setInvalidateSuccessKey(null);
+      }, 3000);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ocorreu um erro inesperado ao invalidar o cache.",
+      );
+    } finally {
+      setInvalidatingKey(null);
     }
   };
 
@@ -504,7 +564,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
   };
 
   const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (
-    event
+    event,
   ) => {
     if (!canUpload) {
       setError("Você não possui permissão para enviar arquivos.");
@@ -539,7 +599,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                 "inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 transition",
                 normalizedActivePrefix === ""
                   ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-900",
               )}
             >
               <HardDrive className="h-4 w-4" />
@@ -754,8 +814,8 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
             requiresSetup
               ? "opacity-60"
               : isDragging
-              ? "border-zinc-500 bg-zinc-50/60 dark:border-zinc-600 dark:from-zinc-900 dark:to-zinc-950"
-              : "border-zinc-200 dark:border-zinc-800"
+                ? "border-zinc-500 bg-zinc-50/60 dark:border-zinc-600 dark:from-zinc-900 dark:to-zinc-950"
+                : "border-zinc-200 dark:border-zinc-800",
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -844,19 +904,22 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                   ) : (
                     paginatedEntries.map((entry) => {
                       if (entry.type === "folder") {
+                        const folderPath = normalizePrefix(
+                          normalizedActivePrefix
+                            ? `${normalizedActivePrefix}/${entry.name}`
+                            : entry.name,
+                        );
+                        const folderKeyToInvalidate = `${folderPath}/*`;
+                        const invalidating =
+                          invalidatingKey === folderKeyToInvalidate;
+                        const invalidateSuccess =
+                          invalidateSuccessKey === folderKeyToInvalidate;
+
                         return (
                           <TableRow
                             key={`folder-${entry.name}`}
                             className="cursor-pointer transition hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
-                            onClick={() =>
-                              setActivePrefix(
-                                normalizePrefix(
-                                  normalizedActivePrefix
-                                    ? `${normalizedActivePrefix}/${entry.name}`
-                                    : entry.name
-                                )
-                              )
-                            }
+                            onClick={() => setActivePrefix(folderPath)}
                           >
                             <TableCell>
                               <div className="flex items-center gap-3">
@@ -873,8 +936,48 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                             <TableCell>Pasta</TableCell>
                             <TableCell>—</TableCell>
                             <TableCell>—</TableCell>
-                            <TableCell className="text-right text-xs text-zinc-400">
-                              Abrir
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <span className="mr-2 text-xs text-zinc-400">
+                                  Abrir
+                                </span>
+                                <PermissionGate
+                                  session={session}
+                                  permissions="upload"
+                                >
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className={cn(
+                                      "transition-colors",
+                                      invalidateSuccess
+                                        ? "text-emerald-500 hover:text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10"
+                                        : "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10",
+                                    )}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleInvalidate(
+                                        folderKeyToInvalidate,
+                                      );
+                                    }}
+                                    disabled={
+                                      invalidating || !!invalidateSuccess
+                                    }
+                                    title={
+                                      invalidateSuccess
+                                        ? "Cache invalidado com sucesso"
+                                        : "Invalidar cache da pasta no CloudFront"
+                                    }
+                                  >
+                                    {invalidating ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Zap className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </PermissionGate>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -884,6 +987,9 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                       const previewType = getFilePreviewType(file.fileName);
                       const previewUrl = file.cdnUrl || file.url;
                       const deleting = deletingKey === file.key;
+                      const invalidating = invalidatingKey === file.key;
+                      const invalidateSuccess =
+                        invalidateSuccessKey === file.key;
 
                       return (
                         <TableRow
@@ -931,6 +1037,35 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                             <div className="flex items-center justify-end gap-1.5">
                               <PermissionGate
                                 session={session}
+                                permissions="upload"
+                              >
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className={cn(
+                                    "transition-colors",
+                                    invalidateSuccess
+                                      ? "text-emerald-500 hover:text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10"
+                                      : "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10",
+                                  )}
+                                  onClick={() => handleInvalidate(file.key)}
+                                  disabled={invalidating || !!invalidateSuccess}
+                                  title={
+                                    invalidateSuccess
+                                      ? "Cache invalidado com sucesso"
+                                      : "Invalidar cache no CloudFront"
+                                  }
+                                >
+                                  {invalidating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Zap className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </PermissionGate>
+                              <PermissionGate
+                                session={session}
                                 permissions="compartilhar"
                               >
                                 <Button
@@ -939,11 +1074,17 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                                   }
                                   size="icon"
                                   variant="ghost"
+                                  title="Copiar link"
                                 >
                                   <Copy className="h-4 w-4" />
                                 </Button>
                               </PermissionGate>
-                              <Button asChild size="icon" variant="ghost">
+                              <Button
+                                asChild
+                                size="icon"
+                                variant="ghost"
+                                title="Fazer download"
+                              >
                                 <a
                                   href={previewUrl}
                                   target="_blank"
@@ -963,6 +1104,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                                   className="text-red-500 hover:text-red-500"
                                   onClick={() => handleDelete(file.key)}
                                   disabled={deleting}
+                                  title="Remover arquivo"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -995,9 +1137,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                       <option value="50">50</option>
                       <option value="100">100</option>
                     </select>
-                    <span>
-                      itens por página de {totalItems} total
-                    </span>
+                    <span>itens por página de {totalItems} total</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1048,7 +1188,7 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                               {pageNumber}
                             </Button>
                           );
-                        }
+                        },
                       )}
                     </div>
 
@@ -1059,12 +1199,10 @@ function FilesWorkspaceContent({ session }: FilesWorkspaceContentProps) {
                       className="rounded-lg"
                       onClick={() =>
                         setCurrentPage((prev) =>
-                          Math.min(Math.max(1, totalPages), prev + 1)
+                          Math.min(Math.max(1, totalPages), prev + 1),
                         )
                       }
-                      disabled={
-                        effectivePage === totalPages || loading
-                      }
+                      disabled={effectivePage === totalPages || loading}
                     >
                       Próxima
                       <ChevronRight className="h-4 w-4" />

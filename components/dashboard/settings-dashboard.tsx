@@ -26,6 +26,7 @@ type SettingsResponse = {
     bucketName: string;
     region: string;
     cdnHost: string;
+    cloudFrontDistributionId: string;
     accessKey: string;
     hasSecretKey: boolean;
   };
@@ -39,6 +40,7 @@ export function SettingsDashboard() {
     bucketName: "",
     region: "",
     cdnHost: "",
+    cloudFrontDistributionId: "",
     accessKey: "",
     secretKey: "",
   });
@@ -64,6 +66,7 @@ export function SettingsDashboard() {
           bucketName: data.settings.bucketName,
           region: data.settings.region,
           cdnHost: data.settings.cdnHost,
+          cloudFrontDistributionId: data.settings.cloudFrontDistributionId,
           accessKey: data.settings.accessKey,
         }));
       })
@@ -73,7 +76,7 @@ export function SettingsDashboard() {
         setError(
           err instanceof Error
             ? err.message
-            : "Ocorreu um erro ao carregar as configurações."
+            : "Ocorreu um erro ao carregar as configurações.",
         );
       })
       .finally(() => setLoading(false));
@@ -87,13 +90,15 @@ export function SettingsDashboard() {
       formState.bucketName !== initialData.bucketName ||
       formState.region !== initialData.region ||
       formState.cdnHost !== initialData.cdnHost ||
+      formState.cloudFrontDistributionId !==
+        initialData.cloudFrontDistributionId ||
       formState.accessKey !== initialData.accessKey ||
       Boolean(formState.secretKey)
     );
   }, [formState, initialData]);
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (
-    event
+    event,
   ) => {
     event.preventDefault();
     setSaving(true);
@@ -110,6 +115,7 @@ export function SettingsDashboard() {
           bucketName: formState.bucketName,
           region: formState.region,
           cdnHost: formState.cdnHost,
+          cloudFrontDistributionId: formState.cloudFrontDistributionId,
           accessKey: formState.accessKey,
           secretKey: formState.secretKey || undefined,
         }),
@@ -135,7 +141,7 @@ export function SettingsDashboard() {
       setError(
         err instanceof Error
           ? err.message
-          : "Ocorreu um erro ao salvar as configurações."
+          : "Ocorreu um erro ao salvar as configurações.",
       );
     } finally {
       setSaving(false);
@@ -217,6 +223,22 @@ export function SettingsDashboard() {
                       }))
                     }
                     placeholder="ex: cdn.empresa.com"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="cloudFrontDistributionId">
+                    CloudFront Distribution ID
+                  </Label>
+                  <Input
+                    id="cloudFrontDistributionId"
+                    value={formState.cloudFrontDistributionId}
+                    onChange={(event) =>
+                      setFormState((state) => ({
+                        ...state,
+                        cloudFrontDistributionId: event.target.value,
+                      }))
+                    }
+                    placeholder="ex: E1A2B3C4D5E6F7"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -306,8 +328,8 @@ export function SettingsDashboard() {
                   {loading
                     ? "Validando dados..."
                     : initialData?.bucketName
-                    ? "Credenciais carregadas."
-                    : "Configure bucket, região e credenciais para habilitar uploads."}
+                      ? "Credenciais carregadas."
+                      : "Configure bucket, região e credenciais para habilitar uploads."}
                 </p>
               </div>
               {initialData?.bucketName ? (

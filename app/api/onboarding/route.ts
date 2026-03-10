@@ -39,14 +39,14 @@ export async function POST(request: Request) {
     if (!appHost || !adminName || !adminEmail || !adminPassword) {
       return NextResponse.json(
         { message: "Informe host do app e credenciais do administrador." },
-        { status: 422 }
+        { status: 422 },
       );
     }
 
     if (!bucketName || !region || !accessKey || !secretKey) {
       return NextResponse.json(
         { message: "Informe bucket, região e chaves da AWS." },
-        { status: 422 }
+        { status: 422 },
       );
     }
 
@@ -110,6 +110,7 @@ export async function POST(request: Request) {
         bucketName: settings.bucketName ?? "",
         region: settings.region ?? "",
         cdnHost: settings.cdnHost ?? "",
+        cloudFrontDistributionId: settings.cloudFrontDistributionId ?? "",
         accessKey: settings.accessKey ?? "",
         secretKey: settings.secretKey ?? "",
       }),
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
     console.error(error);
     return NextResponse.json(
       { message: "Falha ao concluir o onboarding." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

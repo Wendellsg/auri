@@ -6,6 +6,7 @@ export type StorageSettings = {
   bucketName: string;
   region: string;
   cdnHost: string;
+  cloudFrontDistributionId: string;
   accessKey: string;
   secretKey: string;
 };
@@ -32,6 +33,7 @@ export async function getStorageSettings() {
       bucketName: record.bucketName,
       region: record.region,
       cdnHost: record.cdnHost ?? "",
+      cloudFrontDistributionId: record.cloudFrontDistributionId ?? "",
       accessKey: record.accessKey,
       secretKey: record.secretKey,
     } satisfies StorageSettings;
@@ -44,6 +46,7 @@ export async function upsertStorageSettings(payload: {
   bucketName: string;
   region: string;
   cdnHost?: string;
+  cloudFrontDistributionId?: string;
   accessKey: string;
   secretKey?: string | null;
 }) {
@@ -53,7 +56,7 @@ export async function upsertStorageSettings(payload: {
 
   const secretKey = payload.secretKey?.trim()
     ? payload.secretKey.trim()
-    : existing?.secretKey ?? null;
+    : (existing?.secretKey ?? null);
 
   const record = await prisma.appSettings.upsert({
     where: { id: APP_SETTINGS_ID },
@@ -61,6 +64,7 @@ export async function upsertStorageSettings(payload: {
       bucketName: payload.bucketName,
       region: payload.region,
       cdnHost: payload.cdnHost ?? "",
+      cloudFrontDistributionId: payload.cloudFrontDistributionId ?? "",
       accessKey: payload.accessKey,
       secretKey,
     },
@@ -69,6 +73,7 @@ export async function upsertStorageSettings(payload: {
       bucketName: payload.bucketName,
       region: payload.region,
       cdnHost: payload.cdnHost ?? "",
+      cloudFrontDistributionId: payload.cloudFrontDistributionId ?? "",
       accessKey: payload.accessKey,
       secretKey,
     },
@@ -83,6 +88,7 @@ export function sanitizeSettingsForClient(settings: StorageSettings | null) {
       bucketName: "",
       region: "",
       cdnHost: "",
+      cloudFrontDistributionId: "",
       accessKey: "",
       hasSecretKey: false,
     };
@@ -92,6 +98,7 @@ export function sanitizeSettingsForClient(settings: StorageSettings | null) {
     bucketName: settings.bucketName,
     region: settings.region,
     cdnHost: settings.cdnHost,
+    cloudFrontDistributionId: settings.cloudFrontDistributionId,
     accessKey: settings.accessKey,
     hasSecretKey: Boolean(settings.secretKey),
   };

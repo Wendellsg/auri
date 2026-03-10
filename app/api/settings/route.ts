@@ -61,6 +61,9 @@ export async function PUT(request: Request) {
     const secretKey =
       typeof payload.secretKey === "string" ? payload.secretKey : null;
     const cdnHost = String(payload.cdnHost ?? "").trim();
+    const cloudFrontDistributionId = String(
+      payload.cloudFrontDistributionId ?? "",
+    ).trim();
 
     if (!bucketName || !region || !accessKey) {
       return NextResponse.json(
@@ -78,6 +81,7 @@ export async function PUT(request: Request) {
       accessKey,
       secretKey,
       cdnHost,
+      cloudFrontDistributionId,
     });
 
     return NextResponse.json({
@@ -86,6 +90,7 @@ export async function PUT(request: Request) {
         bucketName: record.bucketName ?? "",
         region: record.region ?? "",
         cdnHost: record.cdnHost ?? "",
+        cloudFrontDistributionId: record.cloudFrontDistributionId ?? "",
         accessKey: record.accessKey ?? "",
         secretKey: record.secretKey ?? "",
       }),
